@@ -1,0 +1,6 @@
+/build/
+/.cache/
+*.sock
+*.db
+*.db-shm
+*.db-wal

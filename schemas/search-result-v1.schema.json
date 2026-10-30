@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/search-result-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "source_snapshot_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "index_generation_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "coverage": {
+      "const": "partial"
+    },
+    "hits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "symbol_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "package_path": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "function",
+              "type",
+              "constant",
+              "variable"
+            ]
+          },
+          "file_path": {
+            "type": "string"
+          },
+          "start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "evidence_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "snippet": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol_id",
+          "name",
+          "package_path",
+          "kind",
+          "file_path",
+          "start_byte",
+          "end_byte",
+          "evidence_id",
+          "snippet"
+        ]
+      },
+      "maxItems": 50
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "source_snapshot_id",
+    "index_generation_id",
+    "coverage",
+    "hits",
+    "truncated",
+    "limitations"
+  ]
+}

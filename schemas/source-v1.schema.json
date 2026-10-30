@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/source-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "seai.source/v1"
+    },
+    "repository_id": {
+      "type": "string"
+    },
+    "base_commit": {
+      "type": "string",
+      "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "goos": {
+          "type": "string"
+        },
+        "goarch": {
+          "type": "string"
+        },
+        "toolchain": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "environment_profile": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "goos",
+        "goarch",
+        "toolchain",
+        "tags",
+        "environment_profile"
+      ]
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mode": {
+            "enum": [
+              "100644",
+              "100755"
+            ]
+          },
+          "content_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "path",
+          "mode",
+          "content_digest"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "repository_id",
+    "base_commit",
+    "build",
+    "files"
+  ]
+}
