@@ -8,13 +8,20 @@
 
 ## Запуск через GigaCode
 
-Для самостоятельной установки и первого прогона агентом есть [пошаговая инструкция](docs/AGENT_QUICKSTART.md): окружение и локальный Go, сборка, проверки, отдельный demo Git-репозиторий, daemon/PID/логи, поиск, вопросы и пробная правка. Открой этот checkout в GigaCode и отправь:
+Для работы с кодом только через SEAI добавлен [набор из пяти skills и установщик](docs/GIGACODE_SKILLS.md): connect, research, plan, change, review. `GIGACODE.md` задаёт постоянную политику; `.gigacode/skills/` содержит процессы для разных задач. Прямое чтение, поиск, правки и product tests другими инструментами запрещены этой инструкцией; если capability отсутствует, агент сообщает об ограничении. Skills не являются техническим sandbox.
 
-```text
-@docs/AGENT_QUICKSTART.md Выполни установку и демонстрацию по шагам 1–4, затем покажи отчёт. Правило пока не меняй.
+В отдельный целевой Git-проект набор устанавливается командой из checkout SEAI:
+
+```sh
+python3 scripts/install_gigacode_skills.py \
+  --project /absolute/path/strategies \
+  --seai /absolute/path/seai/build/seai \
+  --data /absolute/path/seai-runtime
 ```
 
-Для GigaCode CLI добавлены Markdown prompt shortcuts `/seai:setup` и `/seai:ask Как работает Eligible?` в `.gigacode/commands/seai/`. Их обнаружение зависит от версии клиента и ещё не проверено на реальной установке GigaCode; прямое прикрепление инструкции остаётся основным способом. Специальный программный адаптер и MCP пока отсутствуют.
+После установки перезапусти GigaCode CLI, проверь `/skills` и `/memory`. Можно написать: «Изучай код только через SEAI и объясни функцию Eligible». Для первоначальной установки самого инструмента есть [отдельный runbook](docs/AGENT_QUICKSTART.md). `/seai:setup` и `/seai:ask` в checkout SEAI теперь подключают установленный daemon и исследуют код в том же режиме.
+
+С текущим backend этот режим позволяет исследование и планирование. Применение patch, file read/diff и выполнение product checks через SEAI ещё не реализованы; соответствующие запросы блокируются, а не обходят SEAI. GigaCode на конкретной машине и native MCP пока не проверены/не реализованы.
 
 ## Требования и сборка
 

@@ -24,3 +24,7 @@
 ## Обновление Go 1.26.6
 
 Целевая версия зафиксирована в корневом и fixture go.mod, а также в создаваемых тестами репозиториях. Обновлены прямые зависимости и `x/sync`; стандартные и внутренние пакеты компилируются toolchain Go 1.26.6. Для старого `go` из PATH добавлен явный отказ `UNSUPPORTED_TOOLCHAIN`. Совместимость AST/types проверяется на generic type alias. Версия анализатора `structural-v2` отделяет новые индексы от поколений старого backend. SQL schema v1 и API `seai.api/v1` не изменены.
+
+## GigaCode skills: SEAI-only
+
+Добавлены seai-connect/research/plan/change/review, постоянная GIGACODE.md policy и project installer для CLI/VS Code layout. Prompt shortcuts согласованы с режимом только через SEAI; прямые read/rg/edit/product tests не используются как fallback. Пока отсутствуют patch/check/diff API, соответствующая часть задачи получает статус ответа агента BLOCKED_BY_SEAI_CAPABILITY. Это набор инструкций и установки metadata, не MCP/broker или принудительный sandbox.

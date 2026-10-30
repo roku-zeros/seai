@@ -41,3 +41,7 @@ Smoke проверил startup, CLI/Unix JSON-RPC, полный индекс syn
 30 октября 2026: проверен shell-синтаксис всех 9 блоков runbook и синтаксис вложенных Python snippets. Выполнены подготовка отдельного demo Git-репозитория по командам инструкции, startup Unix daemon, doctor/status, индексация, поиск Eligible/MinimumAge/TestEligibleBoundary, изменение demo порога на 21 с тестами 20/21/22 и повторная индексация working tree. Все шаги PASS; snapshot/generation IDs изменились. Данные и daemon проверки удалены/остановлены.
 
 Prompt shortcuts проверены на наличие file injection, description и args placeholder по документированному формату. Реальная загрузка shortcuts и поведение модели в установленном GigaCode не проверялись. Установка Go проверяется предыдущим отчётом; новый сетевой download-блок инструкции проверен синтаксически, повторно архив не скачивался.
+
+## SEAI-only skills
+
+30 октября 2026: пять SKILL.md прошли quick_validate.py skill-creator (frontmatter/имена/описания/scaffold). Пять component tests установщика PASS: сохранность пользовательской памяти и ignore-файла, идемпотентность, отсутствие частичной установки при конфликте, сохранность отредактированной managed-политики, Git root/runtime guards, VS Code layout и отказ на symlink destination. Проверка модели в реальном GigaCode не выполнялась; policy не является техническим ограничением native tools. Go backend не менялся.
