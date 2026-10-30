@@ -35,3 +35,9 @@ Smoke выполнен с разрешением на локальный Unix so
 Smoke проверил startup, CLI/Unix JSON-RPC, полный индекс synthetic fixture, exact search, сохранность evidence после изменения live-файла, restart daemon, idempotent retry и неизменность HEAD/live-правок пользователя. В sandbox ОС создание Unix socket было запрещено; успешный smoke выполнен с разрешённым запуском вне sandbox, без внешней сети. Runtime и fixture smoke были временными и удалены после проверки.
 
 Это проверки начального инженерного среза. Они не заменяют полный набор ACC/REL, реальную типизацию продукта, provider smoke, проверку корпоративной изоляции, пилотные сценарии, performance benchmark и backup/restore.
+
+## Проверка инструкции для GigaCode
+
+30 октября 2026: проверен shell-синтаксис всех 9 блоков runbook и синтаксис вложенных Python snippets. Выполнены подготовка отдельного demo Git-репозитория по командам инструкции, startup Unix daemon, doctor/status, индексация, поиск Eligible/MinimumAge/TestEligibleBoundary, изменение demo порога на 21 с тестами 20/21/22 и повторная индексация working tree. Все шаги PASS; snapshot/generation IDs изменились. Данные и daemon проверки удалены/остановлены.
+
+Prompt shortcuts проверены на наличие file injection, description и args placeholder по документированному формату. Реальная загрузка shortcuts и поведение модели в установленном GigaCode не проверялись. Установка Go проверяется предыдущим отчётом; новый сетевой download-блок инструкции проверен синтаксически, повторно архив не скачивался.

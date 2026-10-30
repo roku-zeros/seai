@@ -6,6 +6,16 @@
 
 Рабочее дерево, HEAD и Git index пользователя не изменяются. Поддержаны явный ref и working tree с изменёнными/удалёнными tracked-файлами и разрешёнными untracked Go/testdata/go.mod/go.sum. Захват working tree выполняется дважды с сопоставлением manifests, до трёх попыток. Это проверка стабильности чтения, не блокировка внешнего редактора.
 
+## Запуск через GigaCode
+
+Для самостоятельной установки и первого прогона агентом есть [пошаговая инструкция](docs/AGENT_QUICKSTART.md): окружение и локальный Go, сборка, проверки, отдельный demo Git-репозиторий, daemon/PID/логи, поиск, вопросы и пробная правка. Открой этот checkout в GigaCode и отправь:
+
+```text
+@docs/AGENT_QUICKSTART.md Выполни установку и демонстрацию по шагам 1–4, затем покажи отчёт. Правило пока не меняй.
+```
+
+Для GigaCode CLI добавлены Markdown prompt shortcuts `/seai:setup` и `/seai:ask Как работает Eligible?` в `.gigacode/commands/seai/`. Их обнаружение зависит от версии клиента и ещё не проверено на реальной установке GigaCode; прямое прикрепление инструкции остаётся основным способом. Специальный программный адаптер и MCP пока отсутствуют.
+
 ## Требования и сборка
 
 Целевая версия — Go 1.26.6 (оба go.mod, все cmd/internal пакеты и тестовые репозитории). Нужны Git, Go 1.26.6+, CGO и C compiler для текущего SQLite-драйвера. Windows пока не поддерживается: используются Unix socket и flock.
@@ -65,7 +75,7 @@ make smoke
 - Symlink/submodule, go.work и любые local replace возвращают UNSUPPORTED_SOURCE. Внешние modules не индексируются; недоступные зависимости становятся diagnostics. Вложенные Go modules не имеют отдельного traversal.
 - Исключаются `.git/**`, `.seai/**`, `vendor/**`, файлы `.env` и `*.key`. Настраиваемый YAML allowlist и отдельный staged/unstaged provenance ещё не реализованы. Не используйте реальные секреты в исследуемых репозиториях; production ACL/retention/GC остаются открытыми P0/P1.
 - Полное перестроение вместо incremental. Старые поколения удерживаются без GC. Crash staging/orphan objects автоматически не удаляются. Индекс не содержит model output и не запускает go generate или тесты.
-- Отсутствуют ChangeSpec/approval, tasks/DAG/workers, Qwen, patch/check runner, release reconciliation/rebase, backup/upgrade/restore, MCP и GigaCode. `doctor` честно возвращает `pilot_ready=false` и причины.
+- Отсутствуют ChangeSpec/approval, tasks/DAG/workers, Qwen, patch/check runner, release reconciliation/rebase, backup/upgrade/restore, MCP и программный GigaCode-адаптер (доступны только prompt shortcuts). `doctor` честно возвращает `pilot_ready=false` и причины.
 
 Неподдержанные RPC-команды завершаются METHOD_NOT_FOUND; нет имитации выполненных задач. [Текущий статус и план](docs/IMPLEMENTATION.md), [паспорт P0](docs/P0.md), [контракты](schemas/).
 
