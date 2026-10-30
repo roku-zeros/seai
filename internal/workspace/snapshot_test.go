@@ -18,7 +18,7 @@ func setup(t *testing.T) Service {
 			t.Fatal(e)
 		}
 	}
-	if e := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module fixture\n\ngo 1.22\n"), 0600); e != nil {
+	if e := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module fixture\n\ngo 1.26.6\n"), 0600); e != nil {
 		t.Fatal(e)
 	}
 	if e := os.WriteFile(filepath.Join(root, "rule.go"), []byte("package fixture\nfunc Rule() int {return 1}\n"), 0600); e != nil {

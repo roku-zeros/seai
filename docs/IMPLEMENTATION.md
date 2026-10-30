@@ -20,3 +20,7 @@
 5. Release plan/apply с атомарным invalidation barrier; task rebase; upgrade/backup/restore. До этого пилот не выпускать.
 
 Сначала закрепляются contracts и correctness guards. Проверка реального продукта и inference не заявляется по синтетическим fixtures. Полная ACC/REL suite остаётся отдельным результатом.
+
+## Обновление Go 1.26.6
+
+Целевая версия зафиксирована в корневом и fixture go.mod, а также в создаваемых тестами репозиториях. Обновлены прямые зависимости и `x/sync`; стандартные и внутренние пакеты компилируются toolchain Go 1.26.6. Для старого `go` из PATH добавлен явный отказ `UNSUPPORTED_TOOLCHAIN`. Совместимость AST/types проверяется на generic type alias. Версия анализатора `structural-v2` отделяет новые индексы от поколений старого backend. SQL schema v1 и API `seai.api/v1` не изменены.

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/version"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
 	"net/url"
@@ -19,7 +20,8 @@ import (
 	"strings"
 )
 
-const Version = "structural-v1"
+const Version = "structural-v2"
+const MinimumGoVersion = "go1.26.6"
 const schema = `CREATE TABLE symbols(id TEXT PRIMARY KEY,name TEXT NOT NULL,package TEXT NOT NULL,kind TEXT NOT NULL,path TEXT NOT NULL,start INTEGER NOT NULL,end INTEGER NOT NULL,evidence TEXT NOT NULL,blob TEXT NOT NULL); CREATE INDEX symbol_names ON symbols(name,package); CREATE TABLE diagnostics(message TEXT NOT NULL);`
 
 var Limitations = []string{"domain extractors are not configured", "call graph and lexical FTS are not implemented", "external modules, cgo and multi-module workspaces are not indexed", "unsaved editor buffers are excluded", "policy excludes vendor/**, .seai/**, .env and *.key"}
@@ -43,6 +45,9 @@ func BuildProfile(ctx context.Context) (domain.Build, error) {
 	v := strings.Fields(string(b))
 	if len(v) != 3 {
 		return domain.Build{}, fmt.Errorf("invalid go environment")
+	}
+	if !version.IsValid(v[0]) || version.Compare(v[0], MinimumGoVersion) < 0 {
+		return domain.Build{}, domain.Err("UNSUPPORTED_TOOLCHAIN", "Go in PATH must be %s or newer, found %s", MinimumGoVersion, v[0])
 	}
 	return domain.Build{Toolchain: v[0], GOOS: v[1], GOARCH: v[2], Tags: []string{}, Profile: "offline-cgo-disabled-v1"}, nil
 }

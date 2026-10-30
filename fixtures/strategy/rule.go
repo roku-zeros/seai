@@ -3,11 +3,13 @@ package strategy
 
 const MinimumAge = 18
 
-type Applicant struct { Age int }
+type Applicant struct{ Age int }
 
 func Eligible(a Applicant) bool { return a.Age >= MinimumAge }
 
 func EligibleReason(a Applicant) string {
- if Eligible(a) { return "eligible" }
- return "below minimum age"
+	if Eligible(a) {
+		return "eligible"
+	}
+	return "below minimum age"
 }

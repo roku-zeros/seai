@@ -1,4 +1,27 @@
-# Проверки инкремента 0.1.0-dev
+# Проверки обновления Go 1.26.6
+
+Дата: 30 октября 2026 года. Стенд: macOS arm64, официальный Go 1.26.6, CGO_ENABLED=1. Системный Go не заменялся; для сборки и запуска использовался отдельный проверенный toolchain в PATH.
+
+| Проверка | Результат |
+|---|---|
+| `go test -race -timeout 120s ./...` | PASS: все 9 пакетов собраны, 13 тестов в 6 пакетах (включая 5 subtests проверки версии) |
+| `go vet ./...` | PASS |
+| `go -C fixtures/strategy test -race ./...` | PASS |
+| `go -C fixtures/strategy vet ./...` | PASS |
+| `go mod verify` | PASS: all modules verified |
+| `go mod tidy -diff` | PASS: нет изменений |
+| Сборка CLI/daemon и `go version -m` | PASS: оба бинарника go1.26.6, зависимости соответствуют go.mod |
+| Сквозной smoke через Unix socket | PASS: startup, CLI/RPC, immutable evidence, restart, idempotency, сохранность пользовательского исходника |
+
+Дополнительно проверены AST/types generic type alias в модуле с `go 1.26.6`, совпадение toolchain индексатора с тестовым toolchain и отказ при Go ниже 1.26.6. Версия анализатора повышена до `structural-v2`; миграция SQL не менялась. Зависимости: go-sqlite3 v1.14.52, x/tools v0.52.0, x/mod v0.42.0, x/sync v0.24.0.
+
+Toolchain: `go1.26.6.darwin-arm64.tar.gz`; SHA-256: `2dc95ce4675829f2df0e86b28bcef3283635902062a5f0580ca659bf570f3204`, проверен по [официальному каталогу Go](https://go.dev/dl/?mode=json&include=all). Smoke generation: `d9b6f98851e310e904b15b91d582aa7d9a8b77539042c16641a4a0b8336bb4c7`.
+
+Smoke выполнен с разрешением на локальный Unix socket вне sandbox, без сети. Реальный Qwen/GigaCode, целевой Linux-стенд и полный ACC/REL набор остаются за границами этих проверок.
+
+---
+
+## Исторические проверки первого инкремента (Go 1.22.1)
 
 Дата: 30 октября 2026 года. Стенд: macOS arm64, Go 1.22.1, development SQLite driver с CGO. Внешние Qwen/GigaCode/репозиторий стратегий не использовались.
 

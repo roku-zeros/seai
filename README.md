@@ -8,9 +8,12 @@
 
 ## Требования и сборка
 
-Проверено на macOS arm64, Go 1.22.1. Нужны Git, Go 1.22+, CGO и C compiler для текущего SQLite-драйвера. Windows пока не поддерживается: используются Unix socket и flock.
+Целевая версия — Go 1.26.6 (оба go.mod, все cmd/internal пакеты и тестовые репозитории). Нужны Git, Go 1.26.6+, CGO и C compiler для текущего SQLite-драйвера. Windows пока не поддерживается: используются Unix socket и flock.
+
+Установите Go 1.26.6 из [официальных загрузок](https://go.dev/dl/#go1.26.6) и убедитесь, что его `bin` находится первым в `PATH`. Индексатор использует `go` из `PATH`; при версии ниже 1.26.6 daemon возвращает `UNSUPPORTED_TOOLCHAIN`. Автоматическое скачивание toolchain в процессе индексации отключено.
 
 ```sh
+go version # для воспроизведения проверок: go1.26.6
 go mod download
 make build
 make test
@@ -70,4 +73,6 @@ make smoke
 
 Unit/component tests проверяют канонические identities без потери целочисленной точности, CAS corruption, path traversal, symlink, dirty/ref snapshots, idempotency, optimistic epoch, rollback публикации, checksums миграции и recovery заданий. Интеграционный тест строит индекс синтетического Go-репозитория и проверяет поиск после live-правки и открытия runtime заново. `make smoke` дополнительно запускает реальные бинарники, Unix RPC и restart daemon.
 
-Технические основания: [go/packages](https://pkg.go.dev/golang.org/x/tools/go/packages) и [SQLite WAL](https://www.sqlite.org/wal.html). Версии для корпоративной поставки требуют отдельной проверки, текущие pins выбраны из доступного локального cache.
+Зависимости обновлены для Go 1.26.6: `golang.org/x/tools v0.52.0`, `golang.org/x/mod v0.42.0`, `golang.org/x/sync v0.24.0`, `github.com/mattn/go-sqlite3 v1.14.52`. После обновления SEAI выполните `index build --wait`: версия анализатора повышена до `structural-v2`, новое задание создаст отдельное поколение. Старый runtime schema v1 сохраняется; SQL-миграция не изменена.
+
+Технические основания: [go/packages](https://pkg.go.dev/golang.org/x/tools/go/packages) и [SQLite WAL](https://www.sqlite.org/wal.html). Версии для корпоративной поставки требуют отдельной проверки, текущие pins выбраны по совместимости с Go 1.26.6 и закреплены в go.mod/go.sum.

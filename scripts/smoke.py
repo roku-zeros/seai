@@ -65,7 +65,7 @@ with tempfile.TemporaryDirectory(prefix="seai-smoke-") as tmp:
         assert repeat["data"]["result"]["index_generation_id"] == generation
         assert run(["git", "-C", repo, "rev-parse", "HEAD"]) == initial
         assert (repo / "rule.go").read_text() == "invalid changed live file\n"
-        print(json.dumps({"status": "passed", "checks": ["daemon startup", "CLI/RPC", "immutable evidence", "restart", "idempotent retry", "user source preserved"], "generation": generation}, indent=2))
+        print(json.dumps({"status": "passed", "go_version": run(["go", "version"]).strip(), "checks": ["daemon startup", "CLI/RPC", "immutable evidence", "restart", "idempotent retry", "user source preserved"], "generation": generation}, indent=2))
     finally:
         if proc is not None and proc.poll() is None:
             proc.terminate()
