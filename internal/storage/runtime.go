@@ -26,27 +26,32 @@ func Open(root string) (*Runtime, error) {
 	if _, e = db.Exec("CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY,checksum TEXT NOT NULL)"); e != nil {
 		return fail(e)
 	}
-	var sum string
-	e = db.QueryRow("SELECT checksum FROM schema_migrations WHERE version=1").Scan(&sum)
-	if e == sql.ErrNoRows {
-		tx, err := db.Begin()
-		if err != nil {
-			return fail(err)
+	for _, m := range []struct {
+		version int
+		sql     string
+	}{{1, migration}, {2, migrations.Workflow}} {
+		var sum string
+		e = db.QueryRow("SELECT checksum FROM schema_migrations WHERE version=?", m.version).Scan(&sum)
+		if e == sql.ErrNoRows {
+			tx, err := db.Begin()
+			if err != nil {
+				return fail(err)
+			}
+			if _, err = tx.Exec(m.sql); err != nil {
+				tx.Rollback()
+				return fail(err)
+			}
+			if _, err = tx.Exec("INSERT INTO schema_migrations VALUES(?,?)", m.version, domain.Digest([]byte(m.sql))); err != nil {
+				tx.Rollback()
+				return fail(err)
+			}
+			e = tx.Commit()
+		} else if e == nil && sum != domain.Digest([]byte(m.sql)) {
+			e = fmt.Errorf("MIGRATION_CHECKSUM_MISMATCH: %d", m.version)
 		}
-		if _, err = tx.Exec(migration); err != nil {
-			tx.Rollback()
-			return fail(err)
+		if e != nil {
+			return fail(e)
 		}
-		if _, err = tx.Exec("INSERT INTO schema_migrations VALUES(1,?)", domain.Digest([]byte(migration))); err != nil {
-			tx.Rollback()
-			return fail(err)
-		}
-		e = tx.Commit()
-	} else if e == nil && sum != domain.Digest([]byte(migration)) {
-		e = fmt.Errorf("MIGRATION_CHECKSUM_MISMATCH")
-	}
-	if e != nil {
-		return fail(e)
 	}
 	if _, e = db.Exec("UPDATE jobs SET state='ABORTED',error='daemon restarted; submit a new operation_id' WHERE state IN ('QUEUED','RUNNING')"); e != nil {
 		return fail(e)
@@ -83,7 +88,7 @@ func (r *Runtime) Publish(project, id, snapshot, path, coverage string, epoch in
 	if _, e = tx.Exec("UPDATE index_generations SET state='READY' WHERE id=?", id); e != nil {
 		return e
 	}
-	result, e := tx.Exec("UPDATE projects SET current_generation_id=?,epoch=epoch+1 WHERE id=? AND epoch=?", id, project, epoch)
+	result, e := tx.Exec("UPDATE projects SET current_generation_id=?,epoch=epoch+CASE WHEN current_generation_id=? THEN 0 ELSE 1 END WHERE id=? AND epoch=?", id, id, project, epoch)
 	if e != nil {
 		return e
 	}

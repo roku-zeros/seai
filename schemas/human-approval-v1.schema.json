@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/human-approval-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "jsonrpc": {
+      "const": "2.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "method": {
+      "const": "human.approve"
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "seai.api/v1"
+        },
+        "operation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "expected_project_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ref": {
+          "type": "string"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 1024,
+          "minLength": 1
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65536
+        },
+        "expected_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "index_generation_id": {
+          "type": "string"
+        },
+        "source_snapshot_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "path": {
+          "type": "string"
+        },
+        "symbol_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec": {
+          "$ref": "change-v1.schema.json"
+        },
+        "plan": {
+          "$ref": "plan-v1.schema.json"
+        },
+        "patch": {
+          "$ref": "patch-v1.schema.json"
+        },
+        "actor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "behavior_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "allow_incomplete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "operation_id",
+        "expected_project_epoch",
+        "expected_revision",
+        "task_id",
+        "actor",
+        "behavior_digest"
+      ]
+    }
+  },
+  "required": [
+    "jsonrpc",
+    "id",
+    "method",
+    "params"
+  ]
+}

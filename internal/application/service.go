@@ -25,14 +25,29 @@ type Service struct {
 	busy      bool
 }
 type Params struct {
-	Schema    string `json:"schema_version"`
-	Operation string `json:"operation_id,omitempty"`
-	Epoch     *int   `json:"expected_project_epoch,omitempty"`
-	Ref       string `json:"ref,omitempty"`
-	Job       string `json:"job_id,omitempty"`
-	Query     string `json:"query,omitempty"`
-	Limit     int    `json:"limit,omitempty"`
+	Schema          string             `json:"schema_version"`
+	Operation       string             `json:"operation_id,omitempty"`
+	Epoch           *int               `json:"expected_project_epoch,omitempty"`
+	Revision        *int               `json:"expected_revision,omitempty"`
+	Ref             string             `json:"ref,omitempty"`
+	Job             string             `json:"job_id,omitempty"`
+	Query           string             `json:"query,omitempty"`
+	Limit           int                `json:"limit,omitempty"`
+	Offset          int                `json:"offset,omitempty"`
+	Cursor          string             `json:"cursor,omitempty"`
+	Generation      string             `json:"index_generation_id,omitempty"`
+	Snapshot        string             `json:"source_snapshot_id,omitempty"`
+	Path            string             `json:"path,omitempty"`
+	Symbol          string             `json:"symbol_id,omitempty"`
+	Task            string             `json:"task_id,omitempty"`
+	Spec            *domain.ChangeSpec `json:"spec,omitempty"`
+	Plan            *domain.Plan       `json:"plan,omitempty"`
+	Patch           *domain.Patch      `json:"patch,omitempty"`
+	Actor           string             `json:"actor,omitempty"`
+	Digest          string             `json:"behavior_digest,omitempty"`
+	AllowIncomplete bool               `json:"allow_incomplete,omitempty"`
 }
+
 type Job struct {
 	ID     string          `json:"job_id"`
 	State  string          `json:"state"`
@@ -47,9 +62,9 @@ func (s *Service) Handle(ctx context.Context, method string, p Params) (any, err
 	}
 	switch method {
 	case "handshake":
-		return map[string]string{"schema_version": domain.API, "server_version": "0.1.0-dev"}, nil
+		return map[string]string{"schema_version": domain.API, "server_version": "0.2.0-dev"}, nil
 	case "capabilities.get":
-		return map[string]any{"structural_search": true, "snapshot_modes": []string{"working_tree", "explicit_ref"}, "provider_ready": false, "multi_agent_ready": false, "pilot_ready": false, "blocking_issues": []string{"P0 Qwen and GigaCode profiles are unverified", "domain patterns and verification isolation are unconfigured", "change/release/upgrade workflows are not implemented"}, "limitations": indexer.Limitations}, nil
+		return map[string]any{"structural_search": true, "snapshot_reads": true, "text_search": true, "typed_references": true, "static_calls": true, "task_contracts": true, "candidate_patches": true, "product_checks": false, "interactive_human_approval": true, "snapshot_modes": []string{"working_tree", "explicit_ref"}, "provider_ready": false, "multi_agent_ready": false, "pilot_ready": false, "blocking_issues": []string{"P0 Qwen and GigaCode profiles are unverified", "domain patterns and verification isolation are unconfigured", "product checks, release reconciliation and upgrade workflows are not implemented"}, "limitations": indexer.Limitations}, nil
 	case "project.get":
 		var id, root string
 		var gen sql.NullString
@@ -69,29 +84,13 @@ func (s *Service) Handle(ctx context.Context, method string, p Params) (any, err
 		j.Error = errtext.String
 		return j, e
 	case "search.entities":
-		if p.Query == "" || len(p.Query) > 1024 || p.Limit < 0 || p.Limit > 50 {
-			return nil, domain.Err("SCHEMA_INVALID", "query required (max 1024 bytes), limit 1..50")
-		}
-		if p.Limit == 0 {
-			p.Limit = 50
-		}
-		var gen, snapshot, path, coverage string
-		e := s.Store.DB.QueryRowContext(ctx, "SELECT g.id,g.snapshot_id,g.path,g.coverage FROM projects p JOIN index_generations g ON g.id=p.current_generation_id WHERE g.state='READY'").Scan(&gen, &snapshot, &path, &coverage)
-		if e == sql.ErrNoRows {
-			return nil, domain.Err("NOT_READY", "build an index first")
-		}
-		if e != nil {
-			return nil, e
-		}
-		hits, truncated, e := indexer.Search(ctx, path, p.Query, p.Limit, s.Workspace.Objects)
-		if e != nil {
-			return nil, e
-		}
-		diagnostics, e := indexer.Diagnostics(ctx, path)
-		if e != nil {
-			return nil, e
-		}
-		return domain.SearchResult{Snapshot: snapshot, Generation: gen, Coverage: coverage, Hits: hits, Truncated: truncated, Limitations: diagnostics}, e
+		return s.research(ctx, method, p)
+
+	case "workspace.status", "files.list", "file.read", "symbol.get", "references.find", "calls.list", "tests.related", "search.text":
+		return s.research(ctx, method, p)
+	case "task.create", "task.get", "task.plan", "task.revise", "task.cancel", "task.resume", "patch.apply", "task.diff", "task.export":
+		return s.workflow(ctx, method, p)
+
 	default:
 		return nil, domain.Err("METHOD_NOT_FOUND", "unsupported method %q", method)
 	}
@@ -104,17 +103,21 @@ func (s *Service) start(ctx context.Context, p Params) (any, error) {
 	digest := domain.Digest(payload)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var prev, state string
-	e := s.Store.DB.QueryRowContext(ctx, "SELECT payload_digest,state FROM jobs WHERE id=?", p.Operation).Scan(&prev, &state)
+	var previousMethod, prev, stored string
+	e := s.Store.DB.QueryRowContext(ctx, "SELECT method,payload_digest,result_json FROM operations WHERE operation_id=?", p.Operation).Scan(&previousMethod, &prev, &stored)
 	if e == nil {
-		if prev != digest {
-			return nil, domain.Err("IDEMPOTENCY_CONFLICT", "operation_id already has another payload")
+		if previousMethod != "index.build" || prev != digest {
+			return nil, domain.Err("IDEMPOTENCY_CONFLICT", "operation_id already binds another method/payload")
 		}
-		return map[string]string{"job_id": p.Operation, "state": state}, nil
+		if !json.Valid([]byte(stored)) {
+			return nil, domain.Err("STORAGE_CORRUPT", "invalid saved job acceptance")
+		}
+		return json.RawMessage(stored), nil
 	}
 	if e != sql.ErrNoRows {
 		return nil, e
 	}
+
 	if s.busy {
 		return nil, domain.Err("WORKFLOW_BUSY", "one index job is already active")
 	}
@@ -125,9 +128,22 @@ func (s *Service) start(ctx context.Context, p Params) (any, error) {
 	if epoch != *p.Epoch {
 		return nil, domain.Err("REVISION_CONFLICT", "expected project epoch %d, actual %d", *p.Epoch, epoch)
 	}
-	if _, e = s.Store.DB.ExecContext(ctx, "INSERT INTO jobs(id,payload_digest,state) VALUES(?,?,'QUEUED')", p.Operation, digest); e != nil {
+	accepted, _ := json.Marshal(map[string]string{"job_id": p.Operation, "state": "QUEUED"})
+	tx, e := s.Store.DB.BeginTx(ctx, nil)
+	if e != nil {
 		return nil, e
 	}
+	defer tx.Rollback()
+	if _, e = tx.ExecContext(ctx, "INSERT INTO jobs(id,payload_digest,state) VALUES(?,?,'QUEUED')", p.Operation, digest); e != nil {
+		return nil, e
+	}
+	if _, e = tx.ExecContext(ctx, "INSERT INTO operations VALUES(?, 'index.build',?,?)", p.Operation, digest, string(accepted)); e != nil {
+		return nil, e
+	}
+	if e = tx.Commit(); e != nil {
+		return nil, e
+	}
+
 	s.busy = true
 	s.wg.Add(1)
 	// Work is detached from the short RPC request. Daemon shutdown waits for completion.

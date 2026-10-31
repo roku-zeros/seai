@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/symbol-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "source_snapshot_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "index_generation_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "historical_or_explicit": {
+      "type": "boolean"
+    },
+    "symbol": {
+      "$ref": "search-result-v1.schema.json#/properties/hits/items"
+    },
+    "blob_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "start_byte": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "end_byte": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "content_base64": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "next_offset": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "source_snapshot_id",
+    "historical_or_explicit",
+    "symbol",
+    "blob_digest",
+    "start_byte",
+    "end_byte",
+    "content_base64",
+    "text",
+    "truncated",
+    "next_offset"
+  ]
+}

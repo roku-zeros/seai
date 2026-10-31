@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/task-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "task_id": {
+      "type": "string"
+    },
+    "alias": {
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "explain",
+        "change",
+        "refactor"
+      ]
+    },
+    "state": {
+      "enum": [
+        "SPEC_READY",
+        "PLANNED",
+        "IMPLEMENTING",
+        "CANCELLED",
+        "NEEDS_INPUT"
+      ]
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "baseline_snapshot_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "candidate_snapshot_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "baseline_epoch": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "spec_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "behavior_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "plan_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "approved": {
+      "type": "boolean"
+    },
+    "checkpoint": {
+      "type": "string"
+    },
+    "spec": {
+      "$ref": "change-v1.schema.json"
+    },
+    "plan": {
+      "$ref": "plan-v1.schema.json"
+    },
+    "freshness": {
+      "enum": [
+        "CURRENT",
+        "STALE"
+      ]
+    },
+    "release_readiness": {
+      "const": "NOT_REVIEW_READY"
+    }
+  },
+  "required": [
+    "task_id",
+    "alias",
+    "kind",
+    "state",
+    "revision",
+    "baseline_snapshot_id",
+    "candidate_snapshot_id",
+    "baseline_epoch",
+    "spec_digest",
+    "behavior_digest",
+    "approved",
+    "spec",
+    "freshness",
+    "release_readiness"
+  ]
+}

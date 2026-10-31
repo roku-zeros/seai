@@ -1,7 +1,11 @@
 package storage
 
 import (
+	"database/sql"
+	"net/url"
 	"os"
+	"path/filepath"
+	"seai.local/seai/internal/domain"
 	"testing"
 )
 
@@ -78,5 +82,36 @@ func TestPublicationRollback(t *testing.T) {
 	var state string
 	if e = r.DB.QueryRow("SELECT state FROM jobs WHERE id='build'").Scan(&state); e != nil || state != "SUCCEEDED" {
 		t.Fatal(state, e)
+	}
+}
+func TestMigrationFromFoundation(t *testing.T) {
+	root := t.TempDir()
+	u := url.URL{Scheme: "file", Path: filepath.Join(root, "runtime.db")}
+	db, e := sql.Open("sqlite3", u.String())
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(migration); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec("INSERT INTO schema_migrations VALUES(1,?)", domain.Digest([]byte(migration))); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec("INSERT INTO projects(id,root) VALUES('existing','/repo')"); e != nil {
+		t.Fatal(e)
+	}
+	db.Close()
+	r, e := Open(root)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer r.DB.Close()
+	var id string
+	if e = r.DB.QueryRow("SELECT id FROM projects").Scan(&id); e != nil || id != "existing" {
+		t.Fatal("project lost", id, e)
+	}
+	var count int
+	if e = r.DB.QueryRow("SELECT count(*) FROM schema_migrations").Scan(&count); e != nil || count != 2 {
+		t.Fatal(count, e)
 	}
 }

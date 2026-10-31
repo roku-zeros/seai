@@ -1,14 +1,15 @@
 ---
 name: seai-change
-description: Обрабатывать запросы на исправление, реализацию, рефакторинг или добавление тестов в режиме доступа к коду только через SEAI, проверяя наличие необходимых возможностей.
+description: Применять ограниченные изменения Go-кода в изолированный candidate через SEAI по принятому контракту, плану, scope и before hashes без прямой правки checkout.
 ---
 
-# Изменение кода только через SEAI
+# Изменение только через SEAI
 
-Соблюдай `.gigacode/seai/POLICY.md`. Исследование может выполняться через SEAI search после подключения. Не переходи к native edit/write, apply_patch, shell/Python, git apply или другим каналам изменений.
+Соблюдай `.gigacode/seai/POLICY.md`. Используй task/spec/plan из seai-plan. Проверь `task status ID`, freshness и состояние. Для change требуется человеческое решение по точному behavior digest: выведи человеку команду `seai --data DATA task approve ID --actor ACTOR`; сам её не выполняй, не вызывай private route и не эмулируй ввод/PTY. При изменении контракта прежнее approval может быть снято. Не называй бизнес-изменение refactor ради обхода решения.
 
-Текущий backend 0.1.0-dev не имеет patch/diff/check/task API. Для применения изменения верни `BLOCKED_BY_SEAI_CAPABILITY`, перечислив недостающие операции: изолированный candidate, before hashes/версия входов, применение patch, diff и проверки результата. Разрешено дать обоснованный план или предложенный фрагмент в ответе на основе evidence; пометь его как неприменённый и непроверенный. При недостатке контекста вместо полного patch верни gap.
+1. Читай текущие bytes/mode/hash через `read PATH --snapshot CANDIDATE_ID`, а не native file read. Candidate после предыдущего patch отличается от baseline; typed graph пока относится к baseline.
+2. Подготовь управляющий `seai.patch/v1`: актуальные base_snapshot_id/spec_digest и file operations в scope/плане. Для существующего пути обязательны before_digest+before_mode; для нового before_digest:null. After содержит content либо content_base64, after_digest и mode=100644/100755; delete:true без after. До 32 paths, after <=64 KiB/file и 512 KiB total. Не обходи лимиты прямой записью.
+3. Сохрани patch-предложение в `.seai/changes/` или вне исходников; вызови `patch apply ID --patch PATH` с актуальной execution revision/epoch. Ошибки scope/preconditions/stale/approval — причина обновить источники/план или запросить решение, не слепо повторять.
+4. Читай новый candidate по snapshot ID, получи `task diff ID`. Не применяй результат в основной checkout. Если пользователь запросил выгрузку, `task export ID --output PATH --allow-incomplete` создаёт diagnostic patch+manifest. Не перезаписывай файлы самостоятельно.
 
-Не выполняй `seai patch apply`, `seai task run` или `seai checks run`: этих CLI-команд нет. Не обходи ограничение просьбой к другому агенту, скрипту или пользователю выполнить прямую правку как часть якобы успешного SEAI workflow. Обновление backend, а не переформулирование промпта, необходимо для такого выполнения.
-
-Если пользователь отдельно меняет режим доступа, следуй новой явно заданной области, не объявляя её по-прежнему SEAI-only. По умолчанию отсутствие capability не снимает выбранное пользователем ограничение.
+Всегда сообщай NOT_REVIEW_READY: runner и независимый reviewer пока отсутствуют. Планируемые проверки и найденные тестовые определения не равны PASSED. Не выполняй go test/make/IDE runner или Git apply напрямую. Полные команды/контракты — docs/WORKFLOW.md из checkout SEAI. При отсутствии необходимой операции — BLOCKED_BY_SEAI_CAPABILITY без обхода SEAI.

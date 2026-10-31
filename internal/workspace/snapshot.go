@@ -12,6 +12,7 @@ import (
 	"seai.local/seai/internal/storage"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 type Service struct {
@@ -29,7 +30,7 @@ func Git(ctx context.Context, root string, args ...string) ([]byte, error) {
 	return b, nil
 }
 func ValidPath(p string) bool {
-	return p != "" && !strings.Contains(p, "\\") && !filepath.IsAbs(p) && filepath.ToSlash(filepath.Clean(p)) == p && p != ".." && !strings.HasPrefix(p, "../")
+	return utf8.ValidString(p) && !strings.ContainsRune(p, 0) && p != "" && !strings.Contains(p, "\\") && !filepath.IsAbs(p) && filepath.ToSlash(filepath.Clean(p)) == p && p != ".." && !strings.HasPrefix(p, "../")
 }
 func excluded(p string) bool {
 	return p == ".git" || strings.HasPrefix(p, ".git/") || p == ".seai" || strings.HasPrefix(p, ".seai/") || strings.HasSuffix(p, ".key") || filepath.Base(p) == ".env" || strings.HasPrefix(p, "vendor/")
@@ -202,4 +203,17 @@ func Materialize(m domain.Manifest, c storage.CAS, dest string) error {
 		}
 	}
 	return nil
+}
+
+// ValidSourcePath applies snapshot exclusions to new candidate files too.
+func ValidSourcePath(p string) bool {
+	if !ValidPath(p) || excluded(p) {
+		return false
+	}
+	for _, part := range strings.Split(p, "/") {
+		if part == ".git" || part == ".seai" {
+			return false
+		}
+	}
+	return true
 }

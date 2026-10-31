@@ -85,7 +85,7 @@ func TestBuildSearchRestartAndIdempotency(t *testing.T) {
 	if e = os.WriteFile(filepath.Join(repo, "rule.go"), []byte("invalid live source"), 0600); e != nil {
 		t.Fatal(e)
 	}
-	result, e := s.Handle(ctx, "search.entities", Params{Schema: p.Schema, Query: "Rule", Limit: 1})
+	result, e := s.Handle(ctx, "search.entities", Params{Schema: p.Schema, Query: "Rule", Limit: 1, Generation: alias.Generation})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -106,7 +106,7 @@ func TestBuildSearchRestartAndIdempotency(t *testing.T) {
 		t.Fatal(e)
 	}
 	s.Store = db
-	if _, e = s.Handle(ctx, "search.entities", Params{Schema: p.Schema, Query: "Rule"}); e != nil {
+	if _, e = s.Handle(ctx, "search.entities", Params{Schema: p.Schema, Query: "Rule", Generation: alias.Generation}); e != nil {
 		t.Fatal("search after restart", e)
 	}
 }

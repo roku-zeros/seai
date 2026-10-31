@@ -20,11 +20,11 @@ import (
 	"strings"
 )
 
-const Version = "structural-v2"
+const Version = "structural-v3"
 const MinimumGoVersion = "go1.26.6"
-const schema = `CREATE TABLE symbols(id TEXT PRIMARY KEY,name TEXT NOT NULL,package TEXT NOT NULL,kind TEXT NOT NULL,path TEXT NOT NULL,start INTEGER NOT NULL,end INTEGER NOT NULL,evidence TEXT NOT NULL,blob TEXT NOT NULL); CREATE INDEX symbol_names ON symbols(name,package); CREATE TABLE diagnostics(message TEXT NOT NULL);`
+const schema = `CREATE TABLE symbols(id TEXT PRIMARY KEY,name TEXT NOT NULL,package TEXT NOT NULL,kind TEXT NOT NULL,path TEXT NOT NULL,start INTEGER NOT NULL,end INTEGER NOT NULL,evidence TEXT NOT NULL,blob TEXT NOT NULL); CREATE INDEX symbol_names ON symbols(name,package); CREATE TABLE diagnostics(message TEXT NOT NULL); CREATE TABLE refs(id TEXT PRIMARY KEY,target TEXT NOT NULL,caller TEXT NOT NULL,name TEXT NOT NULL,path TEXT NOT NULL,start INTEGER NOT NULL,end INTEGER NOT NULL,kind TEXT NOT NULL,certainty TEXT NOT NULL,evidence TEXT NOT NULL); CREATE INDEX ref_targets ON refs(target,kind,path,start); CREATE INDEX ref_callers ON refs(caller,kind); CREATE TABLE chunks(id INTEGER PRIMARY KEY,path TEXT NOT NULL,blob TEXT NOT NULL,start INTEGER NOT NULL,text TEXT NOT NULL,evidence TEXT NOT NULL); CREATE INDEX chunk_evidence ON chunks(evidence); CREATE TABLE source_files(path TEXT PRIMARY KEY,blob TEXT NOT NULL,mode TEXT NOT NULL,evidence TEXT NOT NULL); CREATE INDEX source_evidence ON source_files(evidence); CREATE TABLE analysis_meta(type_errors INTEGER NOT NULL);`
 
-var Limitations = []string{"domain extractors are not configured", "call graph and lexical FTS are not implemented", "external modules, cgo and multi-module workspaces are not indexed", "unsaved editor buffers are excluded", "policy excludes vendor/**, .seai/**, .env and *.key"}
+var Limitations = []string{"domain extractors are not configured", "calls cover named functions and static typed targets; dynamic calls are possible/unresolved; text search is literal per-line, not FTS5", "external modules, cgo and multi-module workspaces are not indexed", "unsaved editor buffers are excluded", "policy excludes vendor/**, .seai/**, .env and *.key"}
 
 func Environment() []string {
 	env := []string{"GOPROXY=off", "GOSUMDB=off", "GOTOOLCHAIN=local", "GOFLAGS=-mod=readonly", "GOWORK=off", "CGO_ENABLED=0", "GOPACKAGESDRIVER=off"}
@@ -130,15 +130,19 @@ func Build(ctx context.Context, root string, cas storage.CAS, m domain.Manifest,
 	}
 	defer tx.Rollback()
 	coverage = "partial" // Structural coverage never implies full domain coverage.
+	typeErrors := 0
 	diagnostics := append([]string{}, Limitations...)
 	if len(pkgs) == 0 {
+		typeErrors++
 		diagnostics = append(diagnostics, "no Go packages found")
 	}
+	definitions := map[string]string{}
 	files := map[string]domain.File{}
 	for _, f := range m.Files {
 		files[f.Path] = f
 	}
 	for _, pkg := range pkgs {
+		typeErrors += len(pkg.Errors)
 		for _, d := range pkg.Errors {
 			diagnostics = append(diagnostics, d.Error())
 		}
@@ -152,11 +156,12 @@ func Build(ctx context.Context, root string, cas storage.CAS, m domain.Manifest,
 			if !ok {
 				continue
 			}
-			add := func(name, kind string, node ast.Node) error {
+			add := func(name, kind string, node ast.Node, ident *ast.Ident) error {
 				start := pkg.Fset.Position(node.Pos()).Offset
 				end := pkg.Fset.Position(node.End()).Offset
 				ev := domain.Digest([]byte(fmt.Sprintf("%s:%s:%d:%d", f.Digest, rel, start, end)))
-				sid := domain.Digest([]byte(pkg.ID + ":" + rel + ":" + name + fmt.Sprint(start)))
+				sid := domain.Digest([]byte(pkg.PkgPath + ":" + rel + ":" + name + fmt.Sprint(start)))
+				definitions[positionKey(pkg.Fset.Position(ident.Pos()).Filename, pkg.Fset.Position(ident.Pos()).Offset)] = sid
 				_, e := tx.Exec("INSERT OR IGNORE INTO symbols VALUES(?,?,?,?,?,?,?,?,?)", sid, name, pkg.PkgPath, kind, rel, start, end, ev, f.Digest)
 				return e
 			}
@@ -172,21 +177,30 @@ func Build(ctx context.Context, root string, cas storage.CAS, m domain.Manifest,
 					if d.Recv != nil {
 						name = receiver(d.Recv.List[0].Type) + "." + name
 					}
-					if e = add(name, "function", d); e != nil {
+					if e = add(name, "function", d, d.Name); e != nil {
 						return "", "", "", e
 					}
 				case *ast.GenDecl:
 					for _, s := range d.Specs {
 						switch v := s.(type) {
 						case *ast.TypeSpec:
-							e = add(v.Name.Name, "type", v)
+							e = add(v.Name.Name, "type", v, v.Name)
+							if iface, ok := v.Type.(*ast.InterfaceType); ok {
+								for _, field := range iface.Methods.List {
+									for _, name := range field.Names {
+										if e = add(v.Name.Name+"."+name.Name, "method", field, name); e != nil {
+											return "", "", "", e
+										}
+									}
+								}
+							}
 						case *ast.ValueSpec:
 							kind := "variable"
 							if d.Tok == token.CONST {
 								kind = "constant"
 							}
 							for _, n := range v.Names {
-								if e = add(n.Name, kind, v); e != nil {
+								if e = add(n.Name, kind, v, n); e != nil {
 									break
 								}
 							}
@@ -198,6 +212,12 @@ func Build(ctx context.Context, root string, cas storage.CAS, m domain.Manifest,
 				}
 			}
 		}
+	}
+	if e = buildDetails(ctx, tx, pkgs, source, m, cas, definitions); e != nil {
+		return "", "", "", e
+	}
+	if _, e = tx.Exec("INSERT INTO analysis_meta VALUES(?)", typeErrors); e != nil {
+		return "", "", "", e
 	}
 	for _, d := range diagnostics {
 		if _, e = tx.Exec("INSERT INTO diagnostics VALUES(?)", d); e != nil {

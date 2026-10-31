@@ -1,4 +1,16 @@
-# Статус реализации
+# Статус реализации 0.2.0-dev
+
+Рабочий путь: CLI → daemon → snapshots/CAS → AST/types/refs/calls/literal search → ChangeSpec/plan/approval → изолированный candidate → diff/diagnostic export. Контракты и команды — [WORKFLOW.md](WORKFLOW.md).
+
+В этом инкременте выполнены первые три этапа в указанном там scope: paged snapshot/file/symbol reads; local typed refs/static calls/direct tests; freshness и исторические IDs; JSON/YAML task contract/revisions, сохранённый последовательный план и интерактивный human approval; ограниченные immutable file operations, atomic candidate publication, before hashes/modes, scope, diff/export и resume checkpoint.
+
+Ограничения: literal search вместо FTS5, неполный dynamic graph, нет candidate type-check после patch, нет runner/reviewer/ready export, workers/DAG, domain extractors, incremental rebuild, release reconcile/rebase, backup/restore, MCP или permission enforcement. Открытые P0 остаются. Это не завершённый пилот и не полная приёмка исходной спецификации.
+
+Следующие этапы: зарегистрированный check runner и AC evidence; Qwen/worker orchestration; release/upgrade/restore; проверка реального продукта и GigaCode. История предыдущих инженерных срезов ниже.
+
+---
+
+## Исторический статус 0.1
 
 Срез 0.1.0-dev: работающий путь `CLI → daemon → Git snapshot → CAS → go/packages → SQLite generation → search`.
 

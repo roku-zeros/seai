@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/patch-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "seai.patch/v1"
+    },
+    "base_snapshot_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "spec_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "before_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before_mode": {
+            "enum": [
+              "100644",
+              "100755"
+            ]
+          },
+          "delete": {
+            "type": "boolean"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 65536
+          },
+          "content_base64": {
+            "type": "string",
+            "contentEncoding": "base64"
+          },
+          "mode": {
+            "enum": [
+              "100644",
+              "100755"
+            ]
+          },
+          "after_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "path",
+          "before_digest"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "delete": {
+                  "const": true
+                }
+              },
+              "required": [
+                "delete"
+              ]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "content"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "content_base64"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "mode"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "after_digest"
+                    ]
+                  }
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "mode",
+                "after_digest"
+              ],
+              "oneOf": [
+                {
+                  "required": [
+                    "content"
+                  ],
+                  "not": {
+                    "required": [
+                      "content_base64"
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "content_base64"
+                  ],
+                  "not": {
+                    "required": [
+                      "content"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 32
+    }
+  },
+  "required": [
+    "schema_version",
+    "base_snapshot_id",
+    "spec_digest",
+    "files"
+  ]
+}

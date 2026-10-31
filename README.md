@@ -1,6 +1,6 @@
 # SEAI — начало реализации на Go
 
-Рабочий фундамент по [спецификации v1](docs/specification-v1.md). Версия `0.1.0-dev`; это первый инженерный инкремент, не готовый пилот.
+Рабочий фундамент по [спецификации v1](docs/specification-v1.md). Версия `0.2.0-dev`: исследование → контракт задачи → изолированный candidate. Это ещё не готовый пилот.
 
 Реализованы два бинарника: CLI `seai` и единственный writer `seaid`. CLI обращается к daemon через Unix socket и JSON-RPC 2.0 с handshake `seai.api/v1`. Daemon сохраняет задания в SQLite (WAL, foreign keys, synchronous FULL), снимает исходники Git в SHA-256 CAS, строит отдельный индекс AST/types через `go/packages` и транзакционно публикует готовое поколение вместе с событием и результатом задания. Поиск точных идентификаторов и подстрок возвращает evidence из сохранённых байтов, а не из текущего checkout.
 
@@ -21,7 +21,7 @@ python3 scripts/install_gigacode_skills.py \
 
 После установки перезапусти GigaCode CLI, проверь `/skills` и `/memory`. Можно написать: «Изучай код только через SEAI и объясни функцию Eligible». Для первоначальной установки самого инструмента есть [отдельный runbook](docs/AGENT_QUICKSTART.md). `/seai:setup` и `/seai:ask` в checkout SEAI теперь подключают установленный daemon и исследуют код в том же режиме.
 
-С текущим backend этот режим позволяет исследование и планирование. Применение patch, file read/diff и выполнение product checks через SEAI ещё не реализованы; соответствующие запросы блокируются, а не обходят SEAI. GigaCode на конкретной машине и native MCP пока не проверены/не реализованы.
+Через SEAI доступны file/symbol reads, literal text search, typed refs/static calls, связанные тесты, ChangeSpec/plan, интерактивное подтверждение человеком, candidate patches и diff/export. [Новые команды и ограничения](docs/WORKFLOW.md). Product checks ещё отсутствуют, поэтому export только диагностический с NOT_REVIEW_READY. GigaCode на конкретной машине и native MCP пока не проверены/не реализованы.
 
 ## Требования и сборка
 
@@ -71,25 +71,24 @@ make smoke
 ./build/seai --data /tmp/seai-demo index build --ref HEAD --operation-id demo-001 --epoch 0 --wait
 ```
 
-При смене payload возвращается IDEMPOTENCY_CONFLICT. Устаревший epoch возвращает REVISION_CONFLICT. Если epoch не задан, CLI получает текущий; для повтора завершённой операции укажите исходный epoch явно. Только одно индексирование выполняется одновременно. Повторная публикация того же поколения новым заданием повышает epoch; release baseline пока не моделируется.
+При смене payload возвращается IDEMPOTENCY_CONFLICT. Устаревший epoch возвращает REVISION_CONFLICT. Если epoch не задан, CLI получает текущий; для повтора завершённой операции укажите исходный epoch явно. Только одно индексирование выполняется одновременно. Повторная публикация того же поколения не повышает epoch; новое generation повышает его. Release baseline пока не моделируется.
 
 ## Границы текущего инкремента
 
-- Индексирует определения функций/методов, типов, констант и переменных; `go/packages` выполняет загрузку AST/types с test variants. Typed references, CALLS, FTS, graph expansion, предметные связи и отдельные signatures пока отсутствуют.
-- Coverage всегда `partial`. Ошибки загрузки/типизации и ограничения возвращаются в поиске. Частичный структурный индекс допустим для исследования, готовность change workflow из него не следует.
-- Поиск читает текущее **опубликованное поколение**. Автоматического freshness detector пока нет: последующие live-изменения не обновляют индекс. Результат содержит snapshot/generation IDs. Для новых исходников явно пересоберите индекс.
-- `GOPROXY=off`, `GOSUMDB=off`, `GOTOOLCHAIN=local`, `GOWORK=off`, `CGO_ENABLED=0`, `GOPACKAGESDRIVER=off`. Go environment наследуется по allowlist; GOFLAGS фиксирован. Это профиль загрузки исходников, не изоляция исполнения тестов ОС.
-- Symlink/submodule, go.work и любые local replace возвращают UNSUPPORTED_SOURCE. Внешние modules не индексируются; недоступные зависимости становятся diagnostics. Вложенные Go modules не имеют отдельного traversal.
-- Исключаются `.git/**`, `.seai/**`, `vendor/**`, файлы `.env` и `*.key`. Настраиваемый YAML allowlist и отдельный staged/unstaged provenance ещё не реализованы. Не используйте реальные секреты в исследуемых репозиториях; production ACL/retention/GC остаются открытыми P0/P1.
-- Полное перестроение вместо incremental. Старые поколения удерживаются без GC. Crash staging/orphan objects автоматически не удаляются. Индекс не содержит model output и не запускает go generate или тесты.
-- Отсутствуют ChangeSpec/approval, tasks/DAG/workers, Qwen, patch/check runner, release reconciliation/rebase, backup/upgrade/restore, MCP и программный GigaCode-адаптер (доступны только prompt shortcuts). `doctor` честно возвращает `pilot_ready=false` и причины.
+Реализованы paged reads из CAS, определения Go AST/types, локальные typed references, static/possible/unresolved calls и direct related tests. Текстовый поиск literal по строкам/chunks; FTS5/reranker и полный dynamic graph не реализованы. Coverage остаётся partial, конкретные type/load diagnostics видны; baseline с type errors блокирует patch.
 
-Неподдержанные RPC-команды завершаются METHOD_NOT_FOUND; нет имитации выполненных задач. [Текущий статус и план](docs/IMPLEMENTATION.md), [паспорт P0](docs/P0.md), [контракты](schemas/).
+Текущие source reads проверяют live freshness. Для исторического generation/snapshot требуется явный ID. При неизменном generation повторный index build не повышает epoch; новый generation делает старые задачи stale. Устаревшие task baselines нужно будет переносить через release reconciliation, пока оно не реализовано.
+
+ChangeSpec/plan/candidate/решения и successful operation results сохраняются в runtime migration 002. Patch не изменяет основной checkout и требует scope/preconditions/ревизии/approval для behavior changes. Проверки и независимый review пока не выполняются: всегда NOT_REVIEW_READY, экспорт требует --allow-incomplete. [Подробный протокол](docs/WORKFLOW.md).
+
+Single-module offline profile: GOPROXY=off, GOSUMDB=off, GOTOOLCHAIN=local, GOWORK=off, CGO_ENABLED=0, GOPACKAGESDRIVER=off. Symlink/submodule, go.work и local replace неподдержаны. Generated code не запускается. Исключены .git/.seai/vendor/.env/*.key по snapshot policy; retention/GC/ACL/квоты и staged provenance не завершены.
+
+Qwen/workers, product runner, domain extractors, incremental index, MCP/broker, release rebase и backup/restore остаются следующими этапами. `pilot_ready=false`. Skills — инструкции, не sandbox. Интерактивное CLI approval не является аутентификацией против другого процесса того же OS user.
 
 ## Проверка
 
 Unit/component tests проверяют канонические identities без потери целочисленной точности, CAS corruption, path traversal, symlink, dirty/ref snapshots, idempotency, optimistic epoch, rollback публикации, checksums миграции и recovery заданий. Интеграционный тест строит индекс синтетического Go-репозитория и проверяет поиск после live-правки и открытия runtime заново. `make smoke` дополнительно запускает реальные бинарники, Unix RPC и restart daemon.
 
-Зависимости обновлены для Go 1.26.6: `golang.org/x/tools v0.52.0`, `golang.org/x/mod v0.42.0`, `golang.org/x/sync v0.24.0`, `github.com/mattn/go-sqlite3 v1.14.52`. После обновления SEAI выполните `index build --wait`: версия анализатора повышена до `structural-v2`, новое задание создаст отдельное поколение. Старый runtime schema v1 сохраняется; SQL-миграция не изменена.
+Зависимости обновлены для Go 1.26.6: `golang.org/x/tools v0.52.0`, `golang.org/x/mod v0.42.0`, `golang.org/x/sync v0.24.0`, `github.com/mattn/go-sqlite3 v1.14.52`. После обновления остановите старый seaid, пересоберите бинарники, запустите новый daemon с прежними --repo/--data/--project, затем выполните `index build --wait`: версия анализатора повышена до `structural-v3`, новое задание создаст отдельное поколение. Runtime получает additive migration 002; применённая SQL migration 001 не изменена.
 
 Технические основания: [go/packages](https://pkg.go.dev/golang.org/x/tools/go/packages) и [SQLite WAL](https://www.sqlite.org/wal.html). Версии для корпоративной поставки требуют отдельной проверки, текущие pins выбраны по совместимости с Go 1.26.6 и закреплены в go.mod/go.sum.

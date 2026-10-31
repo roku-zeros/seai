@@ -36,7 +36,8 @@
               "function",
               "type",
               "constant",
-              "variable"
+              "variable",
+              "method"
             ]
           },
           "file_path": {

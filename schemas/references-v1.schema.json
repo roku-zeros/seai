@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/references-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "source_snapshot_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "index_generation_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "historical_or_explicit": {
+      "type": "boolean"
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "target_id": {
+            "type": "string",
+            "pattern": "^([a-f0-9]{64})?$"
+          },
+          "caller_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "target_name": {
+            "type": "string"
+          },
+          "file_path": {
+            "type": "string"
+          },
+          "start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "kind": {
+            "enum": [
+              "REFERENCES",
+              "CALLS"
+            ]
+          },
+          "certainty": {
+            "enum": [
+              "exact",
+              "possible",
+              "unresolved"
+            ]
+          },
+          "evidence_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "target_id",
+          "target_name",
+          "file_path",
+          "start_byte",
+          "end_byte",
+          "kind",
+          "certainty",
+          "evidence_id"
+        ]
+      }
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "next_offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "scope": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "source_snapshot_id",
+    "historical_or_explicit",
+    "references",
+    "truncated",
+    "next_offset",
+    "scope"
+  ]
+}

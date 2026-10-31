@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/text-search-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "source_snapshot_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "index_generation_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "historical_or_explicit": {
+      "type": "boolean"
+    },
+    "hits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "file_path": {
+            "type": "string"
+          },
+          "blob_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "match_start_byte": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "snippet": {
+            "type": "string"
+          },
+          "evidence_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "file_path",
+          "blob_digest",
+          "start_byte",
+          "end_byte",
+          "match_start_byte",
+          "snippet",
+          "evidence_id"
+        ]
+      }
+    },
+    "next_cursor": {
+      "type": "string"
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "mode": {
+      "const": "literal-case-sensitive-lines"
+    }
+  },
+  "required": [
+    "source_snapshot_id",
+    "historical_or_explicit",
+    "hits",
+    "next_cursor",
+    "truncated",
+    "mode"
+  ]
+}

@@ -26,7 +26,7 @@ func run() int {
 	}
 	args := f.Args()
 	if *data == "" || len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: seai --data <runtime> [--json] doctor|project status|index build [--ref REF] [--wait]|job status ID|search QUERY")
+		fmt.Fprintln(os.Stderr, "usage: seai --data <runtime> [--json] doctor|project status|workspace status|index build|job status ID|search QUERY|files|read PATH|symbol ID|references ID|calls ID|tests related ID|task ...|patch apply ... (docs/WORKFLOW.md)")
 		return 2
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -103,16 +103,79 @@ func run() int {
 		}
 		method = "jobs.get"
 		p.Job = args[2]
-	case "search":
-		if len(args) != 2 {
+	default:
+		var options extendedOptions
+		method, p, options, e = parseExtended(args)
+		if e != nil {
+			fmt.Fprintln(os.Stderr, e)
 			return 2
 		}
-		method = "search.entities"
-		p.Query = args[1]
-	default:
-		fmt.Fprintln(os.Stderr, "unsupported command:", args[0])
-		return 2
+		if options.mutation {
+			if p.Operation == "" {
+				b := make([]byte, 16)
+				if _, e = rand.Read(b); e != nil {
+					return 4
+				}
+				p.Operation = hex.EncodeToString(b)
+			}
+			if p.Epoch == nil {
+				state, err := transports.Call(ctx, socket, "project.get", application.Params{})
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err)
+					return 4
+				}
+				if state.Error != nil {
+					return printEnvelope(state)
+				}
+				var current struct {
+					Epoch int `json:"epoch"`
+				}
+				raw, _ := json.Marshal(state.Data)
+				if json.Unmarshal(raw, &current) != nil {
+					return 4
+				}
+				p.Epoch = &current.Epoch
+			}
+			if p.Revision == nil {
+				rev := 0
+				if method != "task.create" {
+					state, err := transports.Call(ctx, socket, "task.get", application.Params{Task: p.Task})
+					if err != nil {
+						fmt.Fprintln(os.Stderr, err)
+						return 4
+					}
+					if state.Error != nil {
+						return printEnvelope(state)
+					}
+					var task struct {
+						Revision int `json:"revision"`
+					}
+					raw, _ := json.Marshal(state.Data)
+					if json.Unmarshal(raw, &task) != nil {
+						return 4
+					}
+					rev = task.Revision
+				}
+				p.Revision = &rev
+			}
+		}
+		if options.human {
+			return approve(ctx, socket, p)
+		}
+		env, err := transports.Call(ctx, socket, method, p)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 4
+		}
+		if options.output != "" && env.Error == nil {
+			if err = writeExport(options, env); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 4
+			}
+		}
+		return printEnvelope(env)
 	}
+
 	env, e := transports.Call(ctx, socket, method, p)
 	if e != nil {
 		fmt.Fprintln(os.Stderr, e)
@@ -159,7 +222,7 @@ func printEnvelope(env transports.Envelope) int {
 	switch env.Error.Code {
 	case "SCHEMA_INVALID", "INVALID_REF", "INVALID_PATH":
 		return 2
-	case "REVISION_CONFLICT", "IDEMPOTENCY_CONFLICT", "WORKFLOW_BUSY", "NOT_READY":
+	case "REVISION_CONFLICT", "IDEMPOTENCY_CONFLICT", "WORKFLOW_BUSY", "NOT_READY", "STALE_WORKSPACE", "STALE_TASK", "PRECONDITION_FAILED", "APPROVAL_REQUIRED", "NOT_REVIEW_READY", "SPEC_NOT_READY", "INVALID_STATE", "TYPE_COVERAGE_GAP":
 		return 3
 	}
 	return 4

@@ -18,7 +18,24 @@
         "project.get",
         "index.build",
         "jobs.get",
-        "search.entities"
+        "search.entities",
+        "workspace.status",
+        "files.list",
+        "file.read",
+        "symbol.get",
+        "references.find",
+        "calls.list",
+        "tests.related",
+        "search.text",
+        "task.create",
+        "task.get",
+        "task.plan",
+        "task.revise",
+        "task.cancel",
+        "task.resume",
+        "patch.apply",
+        "task.diff",
+        "task.export"
       ]
     },
     "params": {
@@ -51,7 +68,57 @@
         "limit": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 50
+          "maximum": 65536
+        },
+        "expected_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "index_generation_id": {
+          "type": "string"
+        },
+        "source_snapshot_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "path": {
+          "type": "string"
+        },
+        "symbol_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spec": {
+          "$ref": "change-v1.schema.json"
+        },
+        "plan": {
+          "$ref": "plan-v1.schema.json"
+        },
+        "patch": {
+          "$ref": "patch-v1.schema.json"
+        },
+        "actor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "behavior_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "allow_incomplete": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -108,6 +175,174 @@
         "properties": {
           "method": {
             "const": "search.entities"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "required": [
+              "query"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "task.create"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "required": [
+              "operation_id",
+              "expected_project_epoch",
+              "expected_revision",
+              "spec"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "task.plan"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "required": [
+              "operation_id",
+              "expected_project_epoch",
+              "expected_revision",
+              "task_id",
+              "plan"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "task.revise"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "required": [
+              "operation_id",
+              "expected_project_epoch",
+              "expected_revision",
+              "task_id",
+              "spec"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "task.cancel"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "required": [
+              "operation_id",
+              "expected_project_epoch",
+              "expected_revision",
+              "task_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "task.resume"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "required": [
+              "operation_id",
+              "expected_project_epoch",
+              "expected_revision",
+              "task_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "patch.apply"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "required": [
+              "operation_id",
+              "expected_project_epoch",
+              "expected_revision",
+              "task_id",
+              "patch"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "task.export"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "required": [
+              "operation_id",
+              "expected_project_epoch",
+              "expected_revision",
+              "task_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "search.text"
           }
         }
       },

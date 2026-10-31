@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/file-read-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "source_snapshot_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "index_generation_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "historical_or_explicit": {
+      "type": "boolean"
+    },
+    "file_path": {
+      "type": "string"
+    },
+    "blob_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "mode": {
+      "enum": [
+        "100644",
+        "100755"
+      ]
+    },
+    "size_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "start_byte": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "end_byte": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "text": {
+      "type": "string"
+    },
+    "content_base64": {
+      "type": "string"
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "next_offset": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "file_evidence_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evidence_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "required": [
+    "source_snapshot_id",
+    "historical_or_explicit",
+    "file_path",
+    "blob_digest",
+    "mode",
+    "size_bytes",
+    "start_byte",
+    "end_byte",
+    "text",
+    "content_base64",
+    "truncated",
+    "next_offset",
+    "file_evidence_id",
+    "evidence_id"
+  ]
+}

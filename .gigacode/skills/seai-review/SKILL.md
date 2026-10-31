@@ -1,12 +1,12 @@
 ---
 name: seai-review
-description: Проверять конкретные функции и тестовые определения по evidence SEAI, обозначать риски и ограничения ревью без прямого чтения diff или самостоятельного запуска тестов.
+description: Проверять исходники и task diff через SEAI по snapshot evidence, различая baseline, candidate и отсутствие выполненных product checks.
 ---
 
 # Ревью через SEAI
 
-Соблюдай `.gigacode/seai/POLICY.md`. Проверь root и snapshot; используй `search <символ>` для кода и названных пользователем тестов. Находка должна ссылаться на конкретный snippet/evidence и объяснять наблюдаемую проблему или условие её возникновения. Общие предположения маркируй отдельно.
+Соблюдай `.gigacode/seai/POLICY.md`. Для задачи запроси `task status ID`, затем `task diff ID` и `read PATH --snapshot BASELINE_OR_CANDIDATE`. Для отдельных функций используй seai-research. Все замечания связывай с конкретными источниками/ranges; live файлы, git diff и IDE buffers напрямую не читай.
 
-Не читай git diff, PR/source files или IDE buffers другими инструментами. Нынешний SEAI не возвращает diff, историческое сравнение двух поколений и terminal test runs. Если запрос требует ревью изменения/PR, полного regression verdict или подтверждения tests PASSED, верни `BLOCKED_BY_SEAI_CAPABILITY` для этой части. Можно дать ограниченное ревью названных определений, не выдавая его за полное ревью diff.
+Сопоставь scope, expected/preserved behavior и AC с diff; различай найденные дефекты, гипотезы и неохваченные зависимости. Graph относится к указанному generation baseline; новый candidate ещё не прошёл повторную типизацию или тесты. Diff/state могут быть историческими и stale — покажи это явно.
 
-Наличие тестовой функции в индексе означает только наличие определения. Это не доказательство выполнения теста. Не запускай go test/make/IDE runner напрямую и не придумывай `checks run` API. Заверши ответ проверенными находками, непроверенными вопросами, snapshot/generation IDs и перечнем отсутствующих свидетельств.
+В этой версии task diff/export доступны, но product check runner и независимый review verdict отсутствуют. Наличие тестовой функции не является terminal run evidence. Не запускай проверки напрямую и не объявляй PASSED/REVIEW_READY/COMPLETED. Публикуй review findings и gaps; diagnostic export с --allow-incomplete остаётся NOT_REVIEW_READY даже при отсутствии найденных замечаний.

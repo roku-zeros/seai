@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/task-diff-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "required_checks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "plan_digest": {
+      "type": "string"
+    },
+    "acceptance_criteria": {
+      "$ref": "change-v1.schema.json#/properties/acceptance_criteria"
+    },
+    "approval_required": {
+      "type": "boolean"
+    },
+    "behavior_approved": {
+      "type": "boolean"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "baseline_snapshot_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "candidate_snapshot_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "spec_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "behavior_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "freshness": {
+      "enum": [
+        "CURRENT",
+        "STALE"
+      ]
+    },
+    "release_readiness": {
+      "const": "NOT_REVIEW_READY"
+    },
+    "checks": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "changed_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "patch": {
+      "type": "string"
+    },
+    "patch_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "base_manifest_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "candidate_manifest_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "base_commit": {
+      "type": "string"
+    },
+    "build": {
+      "$ref": "source-v1.schema.json#/properties/build"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "source-v1.schema.json#/properties/files/items"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "source-v1.schema.json#/properties/files/items"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "before",
+          "after"
+        ]
+      }
+    },
+    "warning": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "required_checks",
+    "plan_digest",
+    "acceptance_criteria",
+    "approval_required",
+    "behavior_approved",
+    "task_id",
+    "revision",
+    "baseline_snapshot_id",
+    "candidate_snapshot_id",
+    "spec_digest",
+    "behavior_digest",
+    "freshness",
+    "release_readiness",
+    "checks",
+    "changed_paths",
+    "patch",
+    "patch_digest",
+    "base_manifest_digest",
+    "candidate_manifest_digest",
+    "base_commit",
+    "build",
+    "files",
+    "warning"
+  ]
+}

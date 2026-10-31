@@ -1,14 +1,15 @@
 ---
 name: seai-plan
-description: Исследовать задачу и составить проверяемый план изменения или рефакторинга по evidence SEAI, особенно для нескольких функций и файлов, без применения изменений.
+description: Составить и сохранить ChangeSpec и план изменения по evidence SEAI с критериями результата, scope и revision guards.
 ---
 
-# План по evidence SEAI
+# Контракт и план через SEAI
 
-Соблюдай `.gigacode/seai/POLICY.md`. Проверь подключение/актуальность снимка как в seai-connect и исследуй имена через search, как в seai-research. Исходники напрямую не читай.
+Соблюдай `.gigacode/seai/POLICY.md`. Исследуй задачу как seai-research. Для уже существующей задачи сначала `task status ID`, не заменяй её baseline текущим checkout молча.
 
-Сопоставь пользовательское требование с конкретными найденными определениями. Для каждого шага укажи основание, предполагаемые файлы/символы и наблюдаемый результат. Разделяй найденное, предположения и неизвестное. Тестовые ожидания бери из требования, а не из воображаемой новой реализации. При бизнес-неоднозначности сформулируй необходимое уточнение, не придумывай правило.
+1. Подготовь JSON/YAML `seai.change/v1`: change_id/spec revision/kind/objective, source_requirements с точным content/revision/SHA-256, scope.files, expected/preserved behavior, acceptance_criteria с behavior IDs/ожиданиями/profile и unresolved. Все коллекции явные массивы. Change требует требования/ожидаемое поведение; refactor требует эквивалентность; explain не даёт права на patch. Не придумывай бизнес-значения и digest источника.
+2. Сохрани управляющий spec в `.seai/changes/` либо вне исходников; вызови `task create --spec PATH`. Для принятого контракта новая версия — `task revise ID --spec PATH`, с увеличением spec revision; после patch revise пока не поддерживается. Не переписывай candidate ради смены контракта.
+3. Составь `seai.plan/v1`: до 12 последовательных steps с id/description/files/criterion_ids/evidence_ids и required_checks. Используй evidence символов/refs/text chunks или file_evidence_id из baseline. Каждый AC покрыт шагом; paths находятся в scope. Checks здесь только запланированы, не выполнены.
+4. Вызови `task plan ID --plan PATH`, сохрани task ID/execution revision, baseline/candidate/spec/behavior digests и epoch. Для точного retry используй исходные operation-id/revision/epoch. Наличие плана не означает REVIEW_READY.
 
-Не обещай полноту impact analysis: backend пока не возвращает typed references/calls/shared consumers. Для среднего или большого изменения выдели этапы исследования и явно укажи непроверенные зависимости.
-
-Верни план в ответе с snapshot/generation IDs и evidence. Не создавай source/test файлы, не делай commit и не вызывай `task plan`: такой команды сейчас нет. Факт составления плана не означает наличие исполнимого workflow. Для реализации через этот backend нужны SEAI patch/precondition/diff/check APIs; они ещё отсутствуют.
+Контракты/команды описаны в docs/WORKFLOW.md из checkout SEAI. Отсутствующие источники/неоднозначные требования остаются gaps. Impact graph неполон. Человек подтверждает behavior digest отдельно; модель не вызывает approve и не подменяет существенное изменение kind=refactor.
