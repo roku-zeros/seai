@@ -1,6 +1,6 @@
 # SEAI — начало реализации на Go
 
-Рабочий фундамент по [спецификации v1](docs/specification-v1.md). Версия `0.2.0-dev`: исследование → контракт задачи → изолированный candidate. Это ещё не готовый пилот.
+Рабочий фундамент по [спецификации v1](docs/specification-v1.md). Версия `0.3.0-dev`: исследование → контракт → candidate → зарегистрированные проверки/review; Qwen workers, release rebase и backup/restore/подготовка upgrade. Это ещё не готовый пилот.
 
 Реализованы два бинарника: CLI `seai` и единственный writer `seaid`. CLI обращается к daemon через Unix socket и JSON-RPC 2.0 с handshake `seai.api/v1`. Daemon сохраняет задания в SQLite (WAL, foreign keys, synchronous FULL), снимает исходники Git в SHA-256 CAS, строит отдельный индекс AST/types через `go/packages` и транзакционно публикует готовое поколение вместе с событием и результатом задания. Поиск точных идентификаторов и подстрок возвращает evidence из сохранённых байтов, а не из текущего checkout.
 
@@ -23,7 +23,13 @@ python3 scripts/install_gigacode_skills.py \
 
 После установки запусти новую GigaCode CLI-сессию из указанного workspace, проверь `/skills` и `/memory`. Затем можно писать обычное «Объясни функцию Eligible» — повторять «используй SEAI» в каждом запросе не требуется правилом. Для первоначальной установки самого инструмента есть [отдельный runbook](docs/AGENT_QUICKSTART.md). `/seai:setup` и `/seai:ask` в checkout SEAI теперь подключают установленный daemon и исследуют код в том же режиме.
 
-Через SEAI доступны file/symbol reads, literal text search, typed refs/static calls, связанные тесты, ChangeSpec/plan, интерактивное подтверждение человеком, candidate patches и diff/export. [Новые команды и ограничения](docs/WORKFLOW.md). Product checks ещё отсутствуют, поэтому export только диагностический с NOT_REVIEW_READY. GigaCode на конкретной машине и native MCP пока не проверены/не реализованы.
+Через SEAI доступны file/symbol reads, literal text search, typed refs/static calls, связанные тесты, ChangeSpec/plan, интерактивное подтверждение человеком, candidate patches и diff/export. [Новые команды и ограничения](docs/WORKFLOW.md). Проверки настраивает оператор; без профилей и независимого review export остаётся диагностическим. [Команды этапов 4–6](docs/EXECUTION.md). GigaCode на конкретной машине и native MCP пока не проверены/не реализованы.
+
+## Qwen: настройте endpoint позже
+
+По вашему решению Qwen оставлен **не настроенным**. В `--config /absolute/runtime.json` добавьте `provider` с endpoint вида `https://YOUR-ENDPOINT/v1`, точным model ID и `api_key_env: "SEAI_QWEN_API_KEY"`; токен передайте только через окружение запуска seaid. Все поля, лимиты и полный JSON — в [инструкции настройки Qwen](docs/EXECUTION.md#настройка-qwen-пользователем). После настройки выполните `provider probe`, дождитесь SUCCEEDED через `run status`, затем используйте `task run TASK`. До этого доступны исследования, candidate и настроенные проверки с человеческим review.
+
+[Этапы 4–6: проверки, роли, релизы, backup и upgrade](docs/EXECUTION.md) содержат команды запуска и синтетический пример для GigaCode. Реальный Qwen, GigaCode и Docker требуют вашей проверки; успешный stub-тест не означает готовность пилота.
 
 ## Требования и сборка
 
@@ -81,7 +87,7 @@ make smoke
 
 Текущие source reads проверяют live freshness. Для исторического generation/snapshot требуется явный ID. При неизменном generation повторный index build не повышает epoch; новый generation делает старые задачи stale. Устаревшие task baselines нужно будет переносить через release reconciliation, пока оно не реализовано.
 
-ChangeSpec/plan/candidate/решения и successful operation results сохраняются в runtime migration 002. Patch не изменяет основной checkout и требует scope/preconditions/ревизии/approval для behavior changes. Проверки и независимый review пока не выполняются: всегда NOT_REVIEW_READY, экспорт требует --allow-incomplete. [Подробный протокол](docs/WORKFLOW.md).
+ChangeSpec/plan/candidate/решения и successful operation results сохраняются в runtime migration 002. Patch не изменяет основной checkout и требует scope/preconditions/ревизии/approval для behavior changes. Зарегистрированные checks и независимый human/model review могут дать REVIEW_READY; без этих доказательств экспорт требует --allow-incomplete. [Подробный протокол](docs/WORKFLOW.md).
 
 Single-module offline profile: GOPROXY=off, GOSUMDB=off, GOTOOLCHAIN=local, GOWORK=off, CGO_ENABLED=0, GOPACKAGESDRIVER=off. Symlink/submodule, go.work и local replace неподдержаны. Generated code не запускается. Исключены .git/.seai/vendor/.env/*.key по snapshot policy; retention/GC/ACL/квоты и staged provenance не завершены.
 
@@ -91,6 +97,6 @@ Qwen/workers, product runner, domain extractors, incremental index, MCP/broker, 
 
 Unit/component tests проверяют канонические identities без потери целочисленной точности, CAS corruption, path traversal, symlink, dirty/ref snapshots, idempotency, optimistic epoch, rollback публикации, checksums миграции и recovery заданий. Интеграционный тест строит индекс синтетического Go-репозитория и проверяет поиск после live-правки и открытия runtime заново. `make smoke` дополнительно запускает реальные бинарники, Unix RPC и restart daemon.
 
-Зависимости обновлены для Go 1.26.6: `golang.org/x/tools v0.52.0`, `golang.org/x/mod v0.42.0`, `golang.org/x/sync v0.24.0`, `github.com/mattn/go-sqlite3 v1.14.52`. После обновления остановите старый seaid, пересоберите бинарники, запустите новый daemon с прежними --repo/--data/--project, затем выполните `index build --wait`: версия анализатора повышена до `structural-v3`, новое задание создаст отдельное поколение. Runtime получает additive migration 002; применённая SQL migration 001 не изменена.
+Зависимости обновлены для Go 1.26.6: `golang.org/x/tools v0.52.0`, `golang.org/x/mod v0.42.0`, `golang.org/x/sync v0.24.0`, `github.com/mattn/go-sqlite3 v1.14.52`. После обновления остановите старый seaid, пересоберите бинарники, запустите новый daemon с прежними --repo/--data/--project, затем выполните `index build --wait`: версия анализатора повышена до `structural-v3`, новое задание создаст отдельное поколение. Runtime получает additive migrations 002 и 003; уже выпущенные migrations 001/002 не изменены. Для сохранения и переноса данных используйте [backup/restore и staged upgrade](docs/EXECUTION.md#backup-restore-и-обновление-самого-seai).
 
 Технические основания: [go/packages](https://pkg.go.dev/golang.org/x/tools/go/packages) и [SQLite WAL](https://www.sqlite.org/wal.html). Версии для корпоративной поставки требуют отдельной проверки, текущие pins выбраны по совместимости с Go 1.26.6 и закреплены в go.mod/go.sum.

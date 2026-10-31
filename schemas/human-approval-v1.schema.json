@@ -12,7 +12,11 @@
       "minLength": 1
     },
     "method": {
-      "const": "human.approve"
+      "enum": [
+        "human.approve",
+        "human.review",
+        "human.requirements"
+      ]
     },
     "params": {
       "type": "object",

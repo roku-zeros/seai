@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix="seai-smoke-") as tmp:
     log = open(root / "daemon.log", "w+")
     try:
         def start():
-            p = subprocess.Popen([str(binaries / "seaid"), "--repo", str(repo), "--data", str(socket_dir), "--project", "smoke"], stdout=log, stderr=log)
+            p = subprocess.Popen([str(binaries / "seaid"), "--repo", str(repo), "--data", str(socket_dir), "--project", "smoke", "--config", str(config)], stdout=log, stderr=log)
             for _ in range(100):
                 if p.poll() is not None:
                     log.seek(0)
@@ -65,12 +65,15 @@ with tempfile.TemporaryDirectory(prefix="seai-smoke-") as tmp:
             elif cmd[0] == "read": name = "file-read-v1.schema.json"
             elif cmd[0] == "symbol": name = "symbol-v1.schema.json"
             elif cmd[0] in ["references", "calls", "tests"]: name = "references-v1.schema.json"
-            elif cmd[0] == "task": name = "task-diff-v1.schema.json" if cmd[1] in ["diff", "export"] else "task-v1.schema.json"
+            elif cmd[0] == "task" and cmd[1] not in ["verify", "run", "rebase"]: name = "task-diff-v1.schema.json" if cmd[1] in ["diff", "export"] else "task-v1.schema.json"
             elif cmd[0] == "patch": name = "task-v1.schema.json"
             elif cmd[0] in ["index", "job"]: name = "job-v1.schema.json"
             if name in validators: validators[name].validate(response["data"])
             return response
 
+        config = root / "runtime.json"
+        run(["python3", source / "scripts/configure_fixture_runtime.py", "--output", config,
+             "--go", shutil.which("go"), "--approve-local-execution"])
         proc = start()
         assert cli("doctor")["data"]["pilot_ready"] is False
         job = cli("index", "build", "--ref", "HEAD", "--operation-id", "smoke-build", "--epoch", "0", "--wait")
@@ -85,6 +88,9 @@ with tempfile.TemporaryDirectory(prefix="seai-smoke-") as tmp:
         assert cli("references", symbol["symbol_id"])["data"]["references"]
         assert cli("tests", "related", symbol["symbol_id"])["data"]["references"]
         assert cli("search", "below minimum age", "--text")["data"]["hits"]
+        assert cli("provider", "status")["data"]["configured"] is False
+        profiles = cli("checks", "profiles")["data"]
+        comparison = next(p for p in profiles if p["id"] == "comparison")
         source_file = cli("read", "rule.go", "--limit", "65536")["data"]
         original_text = source_file["text"]
         spec = {
@@ -92,12 +98,12 @@ with tempfile.TemporaryDirectory(prefix="seai-smoke-") as tmp:
             "kind": "refactor", "objective": "Rename threshold constant preserving all behavior",
             "source_requirements": [], "scope": {"files": ["rule.go"]}, "expected_behavior": [],
             "preserved_behavior": [{"id": "INV1", "statement": "Eligibility and reason outputs remain equivalent"}],
-            "acceptance_criteria": [{"id": "AC1", "behavior_ids": ["INV1"], "expected": "17 false; 18 true; 19 true; same reasons", "assertion_profile": "equivalence-v1"}],
+            "acceptance_criteria": [{"id": "AC1", "behavior_ids": ["INV1"], "expected": "17 false; 18 true; 19 true; same reasons", "assertion_profile": "eligibility-v1", "fixture_digest": comparison["fixture_digest"]}],
             "unresolved": []}
         spec_path = root / "spec.json"
         spec_path.write_text(json.dumps(spec))
         task = cli("task", "create", "--spec", str(spec_path))["data"]
-        plan = {"schema_version": "seai.plan/v1", "steps": [{"id": "S1", "description": "Rename declaration and use", "files": ["rule.go"], "criterion_ids": ["AC1"], "evidence_ids": [source_file["file_evidence_id"]]}], "required_checks": ["compile", "targeted", "regression", "version-comparison"]}
+        plan = {"schema_version": "seai.plan/v1", "steps": [{"id": "S1", "description": "Rename declaration and use", "files": ["rule.go"], "criterion_ids": ["AC1"], "evidence_ids": [source_file["file_evidence_id"]]}], "required_checks": ["compile", "tests", "comparison"]}
         plan_path = root / "plan.json"
         plan_path.write_text(json.dumps(plan))
         task = cli("task", "plan", task["task_id"], "--plan", str(plan_path))["data"]
@@ -109,6 +115,18 @@ with tempfile.TemporaryDirectory(prefix="seai-smoke-") as tmp:
         assert "EligibilityMinimumAge" in cli("read", "rule.go", "--snapshot", task["candidate_snapshot_id"], "--limit", "65536")["data"]["text"]
         assert cli("read", "rule.go", "--limit", "65536")["data"]["text"] == original_text
         assert cli("task", "diff", task["task_id"])["data"]["patch"]
+        def wait_run(accepted):
+            rid = accepted["data"]["run_id"]
+            for _ in range(600):
+                state = cli("run", "status", rid)["data"]
+                if state["state"] not in ["QUEUED", "RUNNING"]:
+                    assert state["state"] == "SUCCEEDED", state
+                    return state
+                time.sleep(0.1)
+            raise RuntimeError("run timeout")
+        check_run = wait_run(cli("task", "verify", task["task_id"]))
+        assert cli("task", "status", task["task_id"])["data"]["check_summary"]["checks_passed"] is True
+        assert "stdout" in cli("run", "logs", check_run["run_id"], "--profile", "tests")["data"]
         output = root / "change.patch"
         cli("task", "export", task["task_id"], "--allow-incomplete", "--output", str(output))
         manifest = json.loads(Path(str(output) + ".manifest.json").read_text())
@@ -130,7 +148,28 @@ with tempfile.TemporaryDirectory(prefix="seai-smoke-") as tmp:
         assert repeat["data"]["result"]["index_generation_id"] == generation
         assert run(["git", "-C", repo, "rev-parse", "HEAD"]) == initial
         assert (repo / "rule.go").read_text() == "invalid changed live file\n"
-        print(json.dumps({"status": "passed", "go_version": run(["go", "version"]).strip(), "checks": ["daemon startup", "CLI/RPC", "immutable evidence", "restart", "idempotent retry", "user source preserved", "snapshot reads and graph", "contract and plan", "isolated candidate", "git-applicable diagnostic export", "task cancel/resume/restart", "stale guard"], "generation": generation}, indent=2))
+        backup = wait_run(cli("backup", "create"))["result"]["backup_path"]
+        restored = root / "restored"
+        run([binaries / "seai", "--data", restored, "backup", "restore", "--from", backup])
+        run([binaries / "seaid", "--data", restored, "--check-data"])
+        bundle = root / "bundle.json"
+        bundle.write_text(json.dumps(dict(schema_version="seai.upgrade/v1", product_version="0.3.0-dev",
+            api_version="seai.api/v1", runtime_schema=3,
+            seai=str(binaries / "seai"), seai_digest=hashlib.sha256((binaries / "seai").read_bytes()).hexdigest(),
+            seaid=str(binaries / "seaid"), seaid_digest=hashlib.sha256((binaries / "seaid").read_bytes()).hexdigest())))
+        installation = root / "installation"
+        locked = subprocess.run([str(binaries / "seai"), "--data", str(socket_dir), "upgrade", "prepare",
+            "--bundle", str(bundle), "--output", str(installation)], capture_output=True, text=True)
+        assert locked.returncode != 0 and "DAEMON_RUNNING" in locked.stderr, locked.stderr
+        proc.terminate()
+        proc.wait(timeout=20)
+        before_upgrade = hashlib.sha256((socket_dir / "runtime.db").read_bytes()).hexdigest()
+        upgrade = json.loads(run([binaries / "seai", "--data", socket_dir, "upgrade", "prepare",
+            "--bundle", bundle, "--output", installation]))
+        assert upgrade["activated"] is False and (installation / "data/runtime.db").exists()
+        assert hashlib.sha256((socket_dir / "runtime.db").read_bytes()).hexdigest() == before_upgrade
+        run([installation / "seaid", "--data", installation / "data", "--check-data"])
+        print(json.dumps({"status": "passed", "go_version": run(["go", "version"]).strip(), "checks": ["daemon startup", "CLI/RPC", "immutable evidence", "restart", "idempotent retry", "user source preserved", "snapshot reads and graph", "contract and plan", "isolated candidate", "git-applicable diagnostic export", "task cancel/resume/restart", "stale guard", "registered compile/test/comparison", "AC fixture binding", "durable logs", "backup/restore", "staged upgrade and live lock", "old runtime preserved"], "generation": generation}, indent=2))
     finally:
         if proc is not None and proc.poll() is None:
             proc.terminate()

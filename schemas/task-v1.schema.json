@@ -73,7 +73,23 @@
       ]
     },
     "release_readiness": {
-      "const": "NOT_REVIEW_READY"
+      "enum": [
+        "NOT_REVIEW_READY",
+        "REVIEW_READY"
+      ]
+    },
+    "check_summary": {
+      "type": "object"
+    },
+    "reconciliation_required": {
+      "type": "boolean"
+    },
+    "requirements_freshness": {
+      "enum": [
+        "local-import",
+        "not_checked",
+        "human-confirmed"
+      ]
     }
   },
   "required": [

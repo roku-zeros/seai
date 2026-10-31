@@ -58,10 +58,10 @@ func Handler(s *application.Service) http.Handler {
 		}
 		var data any
 		if r.URL.Path == "/human/approve" {
-			if req.Method != "human.approve" {
+			if req.Method != "human.approve" && req.Method != "human.review" && req.Method != "human.requirements" {
 				e = domain.Err("METHOD_NOT_FOUND", "approval route only")
 			} else {
-				data, e = s.ApproveHuman(r.Context(), req.Params)
+				data, e = s.DecideHuman(r.Context(), req.Method, req.Params)
 			}
 		} else {
 			data, e = s.Handle(r.Context(), req.Method, req.Params)
@@ -88,6 +88,9 @@ func Handler(s *application.Service) http.Handler {
 }
 func Call(ctx context.Context, socket, method string, p application.Params) (Envelope, error) {
 	return callRoute(ctx, socket, "/rpc", method, p)
+}
+func HumanDecision(ctx context.Context, socket, method string, p application.Params) (Envelope, error) {
+	return callRoute(ctx, socket, "/human/approve", method, p)
 }
 func HumanApproval(ctx context.Context, socket string, p application.Params) (Envelope, error) {
 	return callRoute(ctx, socket, "/human/approve", "human.approve", p)

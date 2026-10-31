@@ -1,6 +1,6 @@
-# SEAI 0.2: исследование → контракт → изолированный candidate
+# SEAI 0.3: исследование → контракт → изолированный candidate
 
-Реализованы первые три этапа: чтение/навигация по неизменяемым исходникам, сохранение задачи и плана, применение ограниченных file operations в CAS candidate. Это рабочий локальный workflow, а не готовый пилот: product check runner, Qwen workers, release reconciliation и независимый reviewer ещё отсутствуют. Поэтому итог всегда `NOT_REVIEW_READY`.
+Реализованы первые три этапа: чтение/навигация по неизменяемым исходникам, сохранение задачи и плана, применение ограниченных file operations в CAS candidate. Этапы 4–6 добавляют зарегистрированные checks, Qwen workers, независимый human/model review, release reconciliation и backup/restore/upgrade: см. [EXECUTION.md](EXECUTION.md). Без настройки и актуальных доказательств итог остаётся `NOT_REVIEW_READY`; готовность пилота не заявляется.
 
 ## Исследование
 
@@ -73,7 +73,7 @@ task cancel <task_id>
 task resume <task_id>
 ```
 
-Plan `seai.plan/v1` содержит steps: id, description, files, criterion_ids, evidence_ids; required_checks содержит имена **планируемых** проверок. Это последовательный план, не worker DAG. До 12 steps; scope paths и criterion IDs сверяются со spec; все критерии должны быть покрыты. Evidence проверяется в выбранном baseline index (symbols/refs/text chunks/file_evidence_id), а не только по формату digest. Проверки пока не запускаются.
+Plan `seai.plan/v1` содержит steps: id, description, files, criterion_ids, evidence_ids; required_checks содержит имена **планируемых** проверок. Это последовательный план, не worker DAG. До 12 steps; scope paths и criterion IDs сверяются со spec; все критерии должны быть покрыты. Evidence проверяется в выбранном baseline index (symbols/refs/text chunks/file_evidence_id), а не только по формату digest. В 0.3 required_checks ссылаются на зарегистрированные operator profiles; `task verify` запускает их, см. EXECUTION.md.
 
 При revise spec.revision должен увеличиваться, alias/kind неизменны. Spec revision и execution revision задачи — разные значения. Поведение хешируется отдельно: его изменение или новая revision требования снимает approval; техническая revision без изменения поведения его сохраняет. План при revise снимается. В этой версии revise возможен до первого patch; существующий candidate не отбрасывается ради переписывания контракта — для такого случая нужна отдельная задача. Прежние редакции/решения остаются историческими.
 
@@ -111,7 +111,7 @@ read rule.go --snapshot <candidate_snapshot_id> --limit 65536
 task export CHG-0042 --format patch --output /path/change.patch --allow-incomplete
 ```
 
-Экспорт без `--allow-incomplete` отклоняется: product checks и reviewer отсутствуют. Diagnostic export содержит git-applicable binary patch и `.manifest.json` с before/after hashes/modes, baseline/candidate/spec/behavior digests и NOT_REVIEW_READY. `--format json` сохраняет один JSON. Существующие output files не перезаписываются. Diff формируется через отдельный временный Git index, без user config/hooks/filters, и не запускает код репозитория. Diff ограничен 1 MiB/file input и 1 MiB output.
+Экспорт без `--allow-incomplete` требует текущих checks, покрытых AC и независимого review (EXECUTION.md). Diagnostic export содержит git-applicable binary patch и `.manifest.json` с before/after hashes/modes, baseline/candidate/spec/behavior digests и NOT_REVIEW_READY. `--format json` сохраняет один JSON. Существующие output files не перезаписываются. Diff формируется через отдельный временный Git index, без user config/hooks/filters, и не запускает код репозитория. Diff ограничен 1 MiB/file input и 1 MiB output.
 
 Live source/build, task revision, baseline epoch, spec/candidate и approval проверяются перед мутацией. Внешняя правка checkout блокирует новые операции, но исторический task diff/read остаётся доступен с маркировкой stale. Новый baseline требует reconciliation, которое относится к следующему этапу и пока не реализовано.
 
@@ -119,6 +119,6 @@ Live source/build, task revision, baseline epoch, spec/candidate и approval п�
 
 CLI автоматически получает текущие expected_revision/expected_project_epoch и генерирует operation_id. Для действий, которые потребуется повторять после разрыва клиента, заранее задавай собственный --operation-id и сохраняй revision/epoch. Для точного повтора используй исходные `--operation-id`, `--revision` и `--epoch`. Тот же ID+payload возвращает сохранённый результат, другой payload — IDEMPOTENCY_CONFLICT. Успешный result/event/revision коммитятся атомарно; отклонённые до commit команды не публикуют candidate.
 
-Для обновления останови старый daemon, собери новые бинарники и запусти seaid с прежними repo/data/project. Затем явно перестрой индекс. SQL migration 001 неизменна; runtime автоматически получает migration 002 с checksum. Это additive migration, но полный backup/upgrade/restore workflow ещё не реализован; не выдавай её за законченную поставку пилота. Новая версия использует Go 1.26.6+, YAML v3.0.1 и structural-v3.
+Для обновления останови старый daemon, собери новые бинарники и запусти seaid с прежними repo/data/project. Затем явно перестрой индекс. SQL migration 001 неизменна; runtime автоматически получает migrations 002/003 с checksum. Backup/restore/staged upgrade описаны в EXECUTION.md; продуктовый пилот требует отдельной приёмки. Новая версия использует Go 1.26.6+, YAML v3.0.1 и structural-v3.
 
-Пока отсутствуют FTS5/ranking, incremental rebuild, полный Go graph, предметные extractors, worker DAG, runner, ready export, rebase и sandbox enforcement. Эти ограничения остаются видны в doctor/diagnostics/отчётах. Этапы 1–3 проверены в пределах описанных контрактов; готовность реального продуктового пилота требует P0 и следующих этапов исходной спецификации.
+Пока отсутствуют FTS5/ranking, incremental rebuild, полный Go graph, предметные extractors и принудительный SEAI-only sandbox для GigaCode. Worker/check/rebase/maintenance workflow доступен в объёме EXECUTION.md. Эти ограничения остаются видны в doctor/diagnostics/отчётах. Этапы 1–3 проверены в пределах описанных контрактов; готовность реального продуктового пилота требует P0 и следующих этапов исходной спецификации.

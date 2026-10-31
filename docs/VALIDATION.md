@@ -1,4 +1,28 @@
-# Проверки 0.2.0-dev — первые три этапа
+# Проверки 0.3.0-dev — этапы 4–6
+
+31 октября 2026, macOS arm64, официальный Go 1.26.6; CGO SQLite v1.14.52. Проверка локальной реализации и синтетического стенда, не приёмка продукта.
+
+| Проверка | Результат |
+|---|---|
+| `go test -race -timeout 180s ./...` + адресные повторы после изменений | PASS: 36 test functions, 12 тестируемых пакетов; все 16 пакетов собираются |
+| `go vet ./...`, fixture race tests/vet | PASS |
+| `go mod tidy -diff`, `go mod verify` | PASS: diff пуст, all modules verified |
+| CLI/daemon build Go 1.26.6 | PASS: 0.3.0-dev |
+| Python installer tests | PASS: 11 сценариев |
+| Skills quick_validate | PASS: все 5 skills |
+| CLI/Unix smoke с JSON Schema validation | PASS: исследование/patch, реальные compile/tests/comparison, AC binding, durable logs, restart/stale/idempotency, backup/restore и staged upgrade |
+
+Новые component scenarios: точные JSON comparisons больших чисел, missing/null, forbidden refactor delta и fixture binding; реальные timeout/cancel/process-group handling и output bounds; отсутствие terminal test evidence для неисполненных тестов; Qwen function-call roundtrip, model mismatch, HTTP retries и отсутствие токена в diagnostics; фиксированный role DAG и independent reviewer FAIL/PASS; resume без повторного patch; candidate tests проверяют границы 20/21/22. Provider — детерминированный localhost HTTP stub, без внешнего inference.
+
+Release tests: pinned apply invalidates all tasks атомарно, конфликт не уничтожает candidate, resolution bound к промежуточному snapshot, approval сохраняется только для неизменившегося behavior, plan сбрасывается и requirements становятся not_checked. Merge tests покрывают независимые text edits, content/mode/delete conflicts. Cancellation/restart tests проверяют operation replay/conflict, mutation barrier, ABORTED и lease fencing позднего результата. Log access ограничен артефактами выбранного run; произвольный CAS digest и поддельный comparison index в stdout отклоняются.
+
+Backup/upgrade smoke проверяет hash/integrity/foreign keys, восстановление CAS/indexes и переписанные paths, отказ overwrite/corrupt backup, lock живого daemon, offline compatibility smoke staged binary, отсутствие автоматической активации и неизменность старого runtime.db. Старые SQL migrations 001/002 не изменены; добавлена 003. Эти тесты не являются полной fault-injection/ACC/REL suite исходной спецификации.
+
+Не проверены реальный Qwen endpoint (по решению пользователя конфигурация оставлена в README), корпоративный GigaCode, Docker backend/его resource limits и поведение модели на среднем/большом продукте. Local-approved runner не имеет OS sandbox; Qwen probe проверяет протокол, не качество модели. Pilot readiness остаётся false. Human approval/review проверены test driver через отдельный маршрут; это не доказательство личности и не аутентификация против того же OS user.
+
+---
+
+## Исторические проверки 0.2.0-dev — первые три этапа
 
 Стенд: macOS arm64, Go 1.26.6, CGO SQLite v1.14.52; YAML v3.0.1. Это верификация локального generic Go workflow, не готовность корпоративного пилота.
 

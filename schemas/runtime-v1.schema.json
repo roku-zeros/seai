@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/runtime-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "seai.runtime/v1"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+          },
+          "kind": {
+            "enum": [
+              "compile",
+              "tests",
+              "comparison"
+            ]
+          },
+          "program": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "type": "string"
+            }
+          },
+          "isolation": {
+            "enum": [
+              "docker",
+              "local-approved"
+            ]
+          },
+          "acknowledge_local_execution": {
+            "type": "boolean"
+          },
+          "docker_image": {
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 900
+          },
+          "max_output_bytes": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 1048576
+          },
+          "memory_mb": {
+            "type": "integer"
+          },
+          "cpus": {
+            "type": "integer"
+          },
+          "assertion_profile": {
+            "type": "string"
+          },
+          "test_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "fixtures": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "input": {
+                  "type": "string"
+                },
+                "expected": {},
+                "criterion_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                },
+                "allowed_paths": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "input",
+                "expected",
+                "criterion_ids",
+                "allowed_paths"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "program",
+          "args",
+          "isolation",
+          "timeout_seconds",
+          "max_output_bytes",
+          "memory_mb",
+          "cpus"
+        ]
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "api_key_env": {
+          "type": "string"
+        },
+        "allow_loopback_http": {
+          "type": "boolean"
+        },
+        "context_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_calls": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_task_tokens": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "endpoint",
+        "model",
+        "api_key_env",
+        "context_tokens",
+        "max_output_tokens",
+        "timeout_seconds",
+        "max_calls",
+        "max_task_tokens"
+      ]
+    },
+    "max_workers": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2
+    },
+    "max_node_attempts": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2
+    },
+    "max_run_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 7200
+    }
+  },
+  "required": [
+    "schema_version",
+    "checks",
+    "max_workers",
+    "max_node_attempts",
+    "max_run_seconds"
+  ]
+}

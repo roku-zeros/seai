@@ -1,0 +1,17 @@
+CREATE TABLE project_control(id INTEGER PRIMARY KEY CHECK(id=1),active_release_id TEXT);
+INSERT INTO project_control(id) VALUES(1);
+CREATE TABLE runs(id TEXT PRIMARY KEY,kind TEXT NOT NULL,task_id TEXT REFERENCES tasks(id),state TEXT NOT NULL CHECK(state IN ('QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','ABORTED','NEEDS_INPUT')),fingerprint TEXT NOT NULL,task_revision INTEGER NOT NULL,epoch INTEGER NOT NULL,lease_epoch INTEGER NOT NULL DEFAULT 1,result_digest TEXT,error TEXT,created_at TEXT NOT NULL,finished_at TEXT);
+CREATE UNIQUE INDEX one_active_run ON runs((1)) WHERE state IN ('QUEUED','RUNNING');
+CREATE TABLE check_runs(id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES runs(id),task_id TEXT NOT NULL REFERENCES tasks(id),candidate_id TEXT NOT NULL,baseline_id TEXT NOT NULL,spec_digest TEXT NOT NULL,plan_digest TEXT NOT NULL,config_digest TEXT NOT NULL,profile_id TEXT NOT NULL,input_digest TEXT NOT NULL,status TEXT NOT NULL,result_digest TEXT,created_at TEXT NOT NULL);
+CREATE INDEX checks_inputs ON check_runs(task_id,candidate_id,spec_digest,plan_digest,config_digest,profile_id,status);
+CREATE TABLE reviews(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES tasks(id),input_digest TEXT NOT NULL,verdict TEXT NOT NULL,actor TEXT NOT NULL,kind TEXT NOT NULL,result_digest TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE TABLE execution_nodes(id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES runs(id),name TEXT NOT NULL,role TEXT NOT NULL,state TEXT NOT NULL,input_digest TEXT NOT NULL,attempt INTEGER NOT NULL,lease_epoch INTEGER NOT NULL,lease_until TEXT,result_digest TEXT,error TEXT,UNIQUE(run_id,name));
+CREATE TABLE node_dependencies(node_id TEXT NOT NULL REFERENCES execution_nodes(id),dependency_id TEXT NOT NULL REFERENCES execution_nodes(id),PRIMARY KEY(node_id,dependency_id));
+CREATE TABLE releases(id TEXT PRIMARY KEY,release_id TEXT NOT NULL UNIQUE,source_id TEXT NOT NULL REFERENCES source_snapshots(id),generation_id TEXT NOT NULL REFERENCES index_generations(id),commit_sha TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE TABLE release_plans(id TEXT PRIMARY KEY,digest TEXT NOT NULL,from_epoch INTEGER NOT NULL,state TEXT NOT NULL,release_alias TEXT NOT NULL);
+CREATE TABLE rebase_attempts(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES tasks(id),target_release TEXT NOT NULL,resolution_base TEXT NOT NULL REFERENCES source_snapshots(id),result_digest TEXT NOT NULL,created_at TEXT NOT NULL);
+ALTER TABLE tasks ADD COLUMN reconciliation_required INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN requirements_freshness TEXT NOT NULL DEFAULT 'local-import';
+ALTER TABLE tasks ADD COLUMN provenance_digest TEXT;
+ALTER TABLE tasks ADD COLUMN active_release_id TEXT;
+CREATE TABLE task_history(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES tasks(id),kind TEXT NOT NULL,result_digest TEXT NOT NULL,created_at TEXT NOT NULL);

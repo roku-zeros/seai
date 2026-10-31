@@ -8,3 +8,6 @@ var Foundation string
 
 //go:embed 002_workflow.sql
 var Workflow string
+
+//go:embed 003_execution.sql
+var Execution string

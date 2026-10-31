@@ -111,7 +111,7 @@ func TestMigrationFromFoundation(t *testing.T) {
 		t.Fatal("project lost", id, e)
 	}
 	var count int
-	if e = r.DB.QueryRow("SELECT count(*) FROM schema_migrations").Scan(&count); e != nil || count != 2 {
+	if e = r.DB.QueryRow("SELECT count(*) FROM schema_migrations").Scan(&count); e != nil || count != 3 {
 		t.Fatal(count, e)
 	}
 }

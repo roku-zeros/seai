@@ -47,6 +47,9 @@ func Validate(s domain.ChangeSpec) error {
 		if c.ID == "" || criteria[c.ID] || c.Expected == "" || c.Profile == "" || len(c.BehaviorIDs) == 0 {
 			return domain.Err("SCHEMA_INVALID", "criterion ID, behavior_ids, expected and assertion_profile required")
 		}
+		if c.FixtureDigest != "" && !regexp.MustCompile(`^[a-f0-9]{64}$`).MatchString(c.FixtureDigest) {
+			return domain.Err("SCHEMA_INVALID", "fixture_digest must be SHA-256")
+		}
 		criteria[c.ID] = true
 		for _, id := range c.BehaviorIDs {
 			if !ids[id] {

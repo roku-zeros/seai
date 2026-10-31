@@ -24,7 +24,7 @@ func TestRPCRejectsMalformedInputs(t *testing.T) {
 }
 func TestHandshakeAndUnsupportedMethod(t *testing.T) {
 	h := Handler(&application.Service{})
-	for _, method := range []string{"handshake", "task.run"} {
+	for _, method := range []string{"handshake", "unknown.method"} {
 		body := `{"jsonrpc":"2.0","id":"1","method":"` + method + `","params":{"schema_version":"seai.api/v1"}}`
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("POST", "/rpc", bytes.NewBufferString(body)))
@@ -38,7 +38,7 @@ func TestHandshakeAndUnsupportedMethod(t *testing.T) {
 		if method == "handshake" && r.Result.Error != nil {
 			t.Fatal(r.Result.Error)
 		}
-		if method == "task.run" && (r.Result.Error == nil || r.Result.Error.Code != "METHOD_NOT_FOUND") {
+		if method == "unknown.method" && (r.Result.Error == nil || r.Result.Error.Code != "METHOD_NOT_FOUND") {
 			t.Fatal("unsupported workflow not rejected")
 		}
 	}

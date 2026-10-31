@@ -26,10 +26,17 @@ func Open(root string) (*Runtime, error) {
 	if _, e = db.Exec("CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY,checksum TEXT NOT NULL)"); e != nil {
 		return fail(e)
 	}
+	var maxVersion int
+	if e = db.QueryRow("SELECT coalesce(max(version),0) FROM schema_migrations").Scan(&maxVersion); e != nil {
+		return fail(e)
+	}
+	if maxVersion > 3 {
+		return fail(fmt.Errorf("UNSUPPORTED_RUNTIME_SCHEMA: %d", maxVersion))
+	}
 	for _, m := range []struct {
 		version int
 		sql     string
-	}{{1, migration}, {2, migrations.Workflow}} {
+	}{{1, migration}, {2, migrations.Workflow}, {3, migrations.Execution}} {
 		var sum string
 		e = db.QueryRow("SELECT checksum FROM schema_migrations WHERE version=?", m.version).Scan(&sum)
 		if e == sql.ErrNoRows {
@@ -50,6 +57,18 @@ func Open(root string) (*Runtime, error) {
 			e = fmt.Errorf("MIGRATION_CHECKSUM_MISMATCH: %d", m.version)
 		}
 		if e != nil {
+			return fail(e)
+		}
+	}
+	var latest int
+	if e = db.QueryRow("SELECT max(version) FROM schema_migrations").Scan(&latest); e != nil {
+		return fail(e)
+	}
+	if latest > 3 {
+		return fail(fmt.Errorf("UNSUPPORTED_RUNTIME_SCHEMA: %d", latest))
+	}
+	for _, stmt := range []string{"UPDATE runs SET state='ABORTED',lease_epoch=lease_epoch+1,error='daemon restarted; resume explicitly' WHERE state IN ('QUEUED','RUNNING')", "UPDATE execution_nodes SET state='ABORTED',lease_epoch=lease_epoch+1,error='daemon restarted' WHERE state='RUNNING'", "UPDATE check_runs SET status='ABORTED' WHERE status='RUNNING'"} {
+		if _, e = db.Exec(stmt); e != nil {
 			return fail(e)
 		}
 	}

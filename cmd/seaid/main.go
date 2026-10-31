@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"seai.local/seai/internal/application"
 	"seai.local/seai/internal/indexer"
+	"seai.local/seai/internal/maintenance"
 	"seai.local/seai/internal/storage"
 	"seai.local/seai/internal/transports"
 	"seai.local/seai/internal/workspace"
@@ -30,7 +31,27 @@ func run() error {
 	repo := flag.String("repo", "", "Git repository root")
 	data := flag.String("data", "", "private runtime directory outside repository")
 	project := flag.String("project", "", "explicit project identity")
+	config := flag.String("config", "", "operator-owned JSON runtime profiles and optional Qwen configuration")
+	version := flag.Bool("version", false, "print executable compatibility manifest")
+	checkData := flag.Bool("check-data", false, "offline migrate and integrity-check runtime, then exit")
 	flag.Parse()
+	if *version {
+		fmt.Println(string(maintenance.VersionJSON()))
+		return nil
+	}
+	if *checkData {
+		lock, e := maintenance.Lock(*data)
+		if e != nil {
+			return e
+		}
+		defer lock.Close()
+		store, e := storage.Open(*data)
+		if e != nil {
+			return e
+		}
+		defer store.DB.Close()
+		return maintenance.CheckFiles(context.Background(), *data, store.DB)
+	}
 	if *repo == "" || *data == "" || *project == "" {
 		return fmt.Errorf("--repo, --data and --project are required")
 	}
@@ -49,14 +70,11 @@ func run() error {
 	if !ok || int(stat.Uid) != os.Getuid() || info.Mode().Perm()&0077 != 0 {
 		return fmt.Errorf("runtime directory must be owned by current user and mode 0700")
 	}
-	lock, e := os.OpenFile(filepath.Join(d, "daemon.lock"), os.O_CREATE|os.O_RDWR, 0600)
+	lock, e := maintenance.Lock(d)
 	if e != nil {
 		return e
 	}
 	defer lock.Close()
-	if e = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); e != nil {
-		return fmt.Errorf("DAEMON_ALREADY_RUNNING: %w", e)
-	}
 	store, e := storage.Open(d)
 	if e != nil {
 		return e
@@ -73,6 +91,9 @@ func run() error {
 		return e
 	}
 	s := &application.Service{Store: store, Data: d, Workspace: workspace.Service{Root: root, Project: *project, Objects: storage.CAS{Root: d}, Build: build}}
+	if e = s.Configure(*config); e != nil {
+		return e
+	}
 	sock := filepath.Join(d, "seaid.sock")
 	if len(sock) > 100 {
 		return fmt.Errorf("socket path too long; choose a shorter --data directory")
@@ -101,8 +122,9 @@ func run() error {
 		defer cancel()
 		_ = server.Shutdown(shutdown)
 	}()
-	log.Printf("seaid 0.2.0-dev project=%s socket=%s", *project, sock)
+	log.Printf("seaid 0.3.0-dev project=%s socket=%s", *project, sock)
 	e = server.Serve(listener)
+	s.CancelRuns()
 	s.Wait()
 	if e == http.ErrServerClosed {
 		return nil

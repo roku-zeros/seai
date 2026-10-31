@@ -35,7 +35,24 @@
         "task.resume",
         "patch.apply",
         "task.diff",
-        "task.export"
+        "task.export",
+        "checks.profiles",
+        "checks.run",
+        "task.verify",
+        "runs.get",
+        "runs.logs",
+        "runs.cancel",
+        "provider.status",
+        "provider.probe",
+        "task.run",
+        "agents.list",
+        "release.plan",
+        "release.inspect",
+        "release.apply",
+        "release.rollback",
+        "task.rebase",
+        "backup.create",
+        "runs.artifact"
       ]
     },
     "params": {
@@ -119,6 +136,28 @@
         },
         "allow_incomplete": {
           "type": "boolean"
+        },
+        "profile_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "resume_from": {
+          "type": "string"
+        },
+        "release_id": {
+          "type": "string"
+        },
+        "overlay_policy": {
+          "type": "string"
+        },
+        "resolution": {
+          "$ref": "patch-v1.schema.json"
+        },
+        "artifact_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       },
       "required": [

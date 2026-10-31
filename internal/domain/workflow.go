@@ -18,10 +18,11 @@ type Behavior struct {
 	Statement string `json:"statement"`
 }
 type Criterion struct {
-	ID          string   `json:"id"`
-	BehaviorIDs []string `json:"behavior_ids"`
-	Expected    string   `json:"expected"`
-	Profile     string   `json:"assertion_profile"`
+	ID            string   `json:"id"`
+	BehaviorIDs   []string `json:"behavior_ids"`
+	Expected      string   `json:"expected"`
+	Profile       string   `json:"assertion_profile"`
+	FixtureDigest string   `json:"fixture_digest,omitempty"`
 }
 type Scope struct {
 	Files []string `json:"files"`
@@ -68,23 +69,26 @@ type Patch struct {
 	Files      []FileOperation `json:"files"`
 }
 type Task struct {
-	ID             string     `json:"task_id"`
-	Alias          string     `json:"alias"`
-	Kind           string     `json:"kind"`
-	State          string     `json:"state"`
-	Revision       int        `json:"revision"`
-	Baseline       string     `json:"baseline_snapshot_id"`
-	Candidate      string     `json:"candidate_snapshot_id"`
-	Epoch          int        `json:"baseline_epoch"`
-	SpecDigest     string     `json:"spec_digest"`
-	BehaviorDigest string     `json:"behavior_digest"`
-	PlanDigest     string     `json:"plan_digest,omitempty"`
-	Approved       bool       `json:"approved"`
-	Checkpoint     string     `json:"checkpoint,omitempty"`
-	Spec           ChangeSpec `json:"spec"`
-	Plan           *Plan      `json:"plan,omitempty"`
-	Freshness      string     `json:"freshness"`
-	Readiness      string     `json:"release_readiness"`
+	ID                    string         `json:"task_id"`
+	Alias                 string         `json:"alias"`
+	Kind                  string         `json:"kind"`
+	State                 string         `json:"state"`
+	Revision              int            `json:"revision"`
+	Baseline              string         `json:"baseline_snapshot_id"`
+	Candidate             string         `json:"candidate_snapshot_id"`
+	Epoch                 int            `json:"baseline_epoch"`
+	SpecDigest            string         `json:"spec_digest"`
+	BehaviorDigest        string         `json:"behavior_digest"`
+	PlanDigest            string         `json:"plan_digest,omitempty"`
+	Approved              bool           `json:"approved"`
+	Checkpoint            string         `json:"checkpoint,omitempty"`
+	Spec                  ChangeSpec     `json:"spec"`
+	Plan                  *Plan          `json:"plan,omitempty"`
+	Freshness             string         `json:"freshness"`
+	Readiness             string         `json:"release_readiness"`
+	CheckSummary          map[string]any `json:"check_summary,omitempty"`
+	Reconciliation        bool           `json:"reconciliation_required,omitempty"`
+	RequirementsFreshness string         `json:"requirements_freshness,omitempty"`
 }
 type Reference struct {
 	Target    string `json:"target_id"`

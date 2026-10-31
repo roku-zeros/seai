@@ -14,6 +14,7 @@ import (
 	"seai.local/seai/internal/changespec"
 	"seai.local/seai/internal/domain"
 	"seai.local/seai/internal/patches"
+	"seai.local/seai/internal/reconcile"
 )
 
 func uniqueID() string {
@@ -34,7 +35,7 @@ type taskReader interface {
 func (s *Service) getTask(ctx context.Context, reader taskReader, id string) (domain.Task, error) {
 	var t domain.Task
 	var plan, approved sql.NullString
-	e := reader.QueryRowContext(ctx, "SELECT id,alias,kind,state,revision,baseline_id,candidate_id,baseline_epoch,spec_digest,behavior_digest,plan_digest,approved_digest,checkpoint FROM tasks WHERE id=? OR alias=? ORDER BY CASE WHEN id=? THEN 0 ELSE 1 END LIMIT 1", id, id, id).Scan(&t.ID, &t.Alias, &t.Kind, &t.State, &t.Revision, &t.Baseline, &t.Candidate, &t.Epoch, &t.SpecDigest, &t.BehaviorDigest, &plan, &approved, &t.Checkpoint)
+	e := reader.QueryRowContext(ctx, "SELECT id,alias,kind,state,revision,baseline_id,candidate_id,baseline_epoch,spec_digest,behavior_digest,plan_digest,approved_digest,checkpoint,reconciliation_required,requirements_freshness FROM tasks WHERE id=? OR alias=? ORDER BY CASE WHEN id=? THEN 0 ELSE 1 END LIMIT 1", id, id, id).Scan(&t.ID, &t.Alias, &t.Kind, &t.State, &t.Revision, &t.Baseline, &t.Candidate, &t.Epoch, &t.SpecDigest, &t.BehaviorDigest, &plan, &approved, &t.Checkpoint, &t.Reconciliation, &t.RequirementsFreshness)
 	if e == sql.ErrNoRows {
 		return t, domain.Err("NOT_FOUND", "task not found")
 	}
@@ -75,7 +76,10 @@ func (s *Service) getTask(ctx context.Context, reader taskReader, id string) (do
 func (s *Service) saveObject(v any) (string, error) {
 	b, e := domain.Canonical(v)
 	if e != nil {
-		return "", e
+		b, e = json.Marshal(v)
+		if e != nil {
+			return "", e
+		}
 	}
 	return s.Workspace.Objects.Put(b)
 }
@@ -93,6 +97,10 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 			t.Freshness = "STALE"
 		} else if e = s.guard(ctx, pin); e != nil {
 			t.Freshness = "STALE"
+		}
+		t.CheckSummary = s.checkSummary(ctx, t)
+		if t.Freshness == "CURRENT" && t.CheckSummary["review_passed"] == true && t.RequirementsFreshness != "not_checked" && t.State != "CANCELLED" {
+			t.Readiness = "REVIEW_READY"
 		}
 		if method == "task.get" {
 			return t, nil
@@ -123,7 +131,7 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 	if e != sql.ErrNoRows {
 		return nil, e
 	}
-	if s.busy {
+	if s.busy && ctx.Value(integratorKey{}) == nil {
 		return nil, domain.Err("WORKFLOW_BUSY", "index publication is in progress")
 	}
 	pin, e := s.resolve(ctx, "")
@@ -148,7 +156,7 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 			return nil, domain.Err("REVISION_CONFLICT", "expected task revision %d, actual %d", *p.Revision, t.Revision)
 		}
 		if method != "task.cancel" && (t.Epoch != pin.Epoch || t.Baseline != pin.Snapshot) {
-			return nil, domain.Err("STALE_TASK", "task baseline/epoch changed; release reconciliation is not implemented")
+			return nil, domain.Err("STALE_TASK", "task baseline/epoch changed; reconcile the task with task rebase")
 		}
 		if t.State == "CANCELLED" && method != "task.resume" {
 			return nil, domain.Err("INVALID_STATE", "resume the cancelled task first")
@@ -178,7 +186,23 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 			return nil, domain.Err("SCHEMA_INVALID", "revision must increase; change_id/kind immutable")
 		}
 		if t.Candidate != t.Baseline {
-			return nil, domain.Err("INVALID_STATE", "revise before applying patches; preserve the existing candidate and create a separate task for a changed contract")
+			base, err := s.manifest(ctx, t.Baseline)
+			if err != nil {
+				return nil, err
+			}
+			candidate, err := s.manifest(ctx, t.Candidate)
+			if err != nil {
+				return nil, err
+			}
+			scope := map[string]bool{}
+			for _, path := range p.Spec.Scope.Files {
+				scope[path] = true
+			}
+			for _, path := range reconcile.Paths(base, candidate) {
+				if !scope[path] {
+					return nil, domain.Err("SCOPE_VIOLATION", "revised contract excludes existing candidate path %s", path)
+				}
+			}
 		}
 		if e = changespec.Validate(*p.Spec); e != nil {
 			return nil, e
@@ -228,6 +252,18 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 		t.Approved = true
 		t.Revision++
 		decision = true
+	case "human.review":
+		summary := s.checkSummary(ctx, t)
+		if p.Actor == "" || len(p.Actor) > 128 || strings.ContainsAny(p.Actor, "\x00\r\n\x1b") || p.Digest != summary["review_digest"] || summary["checks_passed"] != true {
+			return nil, domain.Err("REVIEW_MISMATCH", "actor, current input digest and successful checks required")
+		}
+		t.Revision++
+	case "human.requirements":
+		if p.Actor == "" || len(p.Actor) > 128 || strings.ContainsAny(p.Actor, "\x00\r\n\x1b") || p.Digest != t.BehaviorDigest {
+			return nil, domain.Err("APPROVAL_MISMATCH", "actor and current behavior digest required")
+		}
+		t.RequirementsFreshness = "human-confirmed"
+		t.Revision++
 	case "task.cancel":
 		if t.State == "CANCELLED" {
 			return nil, domain.Err("INVALID_STATE", "already cancelled")
@@ -283,8 +319,12 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 		t.State = "IMPLEMENTING"
 		t.Revision++
 	case "task.export":
-		if !p.AllowIncomplete {
-			return nil, domain.Err("NOT_REVIEW_READY", "checks/reviewer not implemented; explicit allow_incomplete required for diagnostic export")
+		t.CheckSummary = s.checkSummary(ctx, t)
+		if t.CheckSummary["review_passed"] == true && t.RequirementsFreshness != "not_checked" {
+			t.Readiness = "REVIEW_READY"
+		}
+		if !p.AllowIncomplete && t.Readiness != "REVIEW_READY" {
+			return nil, domain.Err("NOT_REVIEW_READY", "current checks and independent review required; allow_incomplete exports diagnostics")
 		}
 		output, e = s.diff(ctx, t)
 		if e != nil {
@@ -351,6 +391,27 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 			return nil, e
 		}
 	}
+	if method == "human.review" {
+		d, err := s.saveObject(map[string]any{"actor": p.Actor, "input_digest": p.Digest, "verdict": "PASS"})
+		if err != nil {
+			return nil, err
+		}
+		if _, e = tx.ExecContext(ctx, "INSERT INTO reviews VALUES(?,?,?,?,?,?,?,?)", uniqueID(), t.ID, p.Digest, "PASS", p.Actor, "interactive-human", d, now()); e != nil {
+			return nil, e
+		}
+	}
+	if method == "human.requirements" {
+		if _, e = tx.ExecContext(ctx, "UPDATE tasks SET requirements_freshness=? WHERE id=?", t.RequirementsFreshness, t.ID); e != nil {
+			return nil, e
+		}
+		d, err := s.saveObject(map[string]any{"actor": p.Actor, "behavior_digest": p.Digest})
+		if err != nil {
+			return nil, err
+		}
+		if _, e = tx.ExecContext(ctx, "INSERT INTO task_history VALUES(?,?,?,?,?)", uniqueID(), t.ID, "human.requirements", d, now()); e != nil {
+			return nil, e
+		}
+	}
 	if decision {
 		if _, e = tx.ExecContext(ctx, "INSERT INTO decisions VALUES(?,?,?,?,?,?,?)", uniqueID(), t.ID, t.BehaviorDigest, t.SpecDigest, p.Actor, "interactive-cli", time.Now().UTC().Format(time.RFC3339Nano)); e != nil {
 			return nil, e
@@ -398,7 +459,7 @@ func (s *Service) diff(ctx context.Context, t domain.Task) (map[string]any, erro
 	if t.Plan != nil {
 		required = t.Plan.Checks
 	}
-	return map[string]any{"required_checks": required, "plan_digest": t.PlanDigest, "acceptance_criteria": t.Spec.Criteria, "approval_required": t.Kind == "change", "behavior_approved": t.Approved, "task_id": t.ID, "revision": t.Revision, "baseline_snapshot_id": t.Baseline, "candidate_snapshot_id": t.Candidate, "spec_digest": t.SpecDigest, "behavior_digest": t.BehaviorDigest, "freshness": t.Freshness, "release_readiness": "NOT_REVIEW_READY", "checks": []string{}, "changed_paths": files, "patch": diff, "patch_digest": digest, "base_manifest_digest": t.Baseline, "candidate_manifest_digest": t.Candidate, "base_commit": a.Commit, "build": a.Build, "files": changedFiles(a, b, files), "warning": "No product checks or independent reviewer have run. Diagnostic export only."}, nil
+	return map[string]any{"required_checks": required, "plan_digest": t.PlanDigest, "acceptance_criteria": t.Spec.Criteria, "approval_required": t.Kind == "change", "behavior_approved": t.Approved, "task_id": t.ID, "revision": t.Revision, "baseline_snapshot_id": t.Baseline, "candidate_snapshot_id": t.Candidate, "spec_digest": t.SpecDigest, "behavior_digest": t.BehaviorDigest, "freshness": t.Freshness, "release_readiness": t.Readiness, "checks": t.CheckSummary, "changed_paths": files, "patch": diff, "patch_digest": digest, "base_manifest_digest": t.Baseline, "candidate_manifest_digest": t.Candidate, "base_commit": a.Commit, "build": a.Build, "files": changedFiles(a, b, files), "warning": "See current check summary; incomplete exports are diagnostic."}, nil
 }
 func (s *Service) validateEvidence(ctx context.Context, path string, plan domain.Plan) error {
 	db, e := sql.Open("sqlite3", indexReadDSN(path))
@@ -446,6 +507,15 @@ func (s *Service) ApproveHuman(ctx context.Context, p Params) (any, error) {
 	return s.workflow(ctx, "human.approve", p)
 }
 
+func (s *Service) DecideHuman(ctx context.Context, method string, p Params) (any, error) {
+	if p.Schema != domain.API {
+		return nil, domain.Err("SCHEMA_INVALID", "API version")
+	}
+	if method != "human.approve" && method != "human.review" && method != "human.requirements" {
+		return nil, domain.Err("METHOD_NOT_FOUND", "human decision")
+	}
+	return s.workflow(ctx, method, p)
+}
 func indexReadDSN(path string) string {
 	u := url.URL{Scheme: "file", Path: path}
 	return u.String() + "?mode=ro&immutable=1"

@@ -31,6 +31,9 @@ func run() int {
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
+	if len(args) >= 2 && ((args[0] == "backup" && args[1] == "restore") || args[0] == "upgrade") {
+		return offline(ctx, *data, args)
+	}
 	socket := filepath.Join(*data, "seaid.sock")
 	hand, e := transports.Call(ctx, socket, "handshake", application.Params{})
 	if e != nil {
@@ -138,7 +141,7 @@ func run() int {
 			}
 			if p.Revision == nil {
 				rev := 0
-				if method != "task.create" {
+				if method != "task.create" && p.Task != "" {
 					state, err := transports.Call(ctx, socket, "task.get", application.Params{Task: p.Task})
 					if err != nil {
 						fmt.Fprintln(os.Stderr, err)
@@ -160,7 +163,7 @@ func run() int {
 			}
 		}
 		if options.human {
-			return approve(ctx, socket, p)
+			return approve(ctx, socket, p, method)
 		}
 		env, err := transports.Call(ctx, socket, method, p)
 		if err != nil {

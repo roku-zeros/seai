@@ -1,4 +1,16 @@
-# Статус реализации 0.2.0-dev
+# Статус реализации 0.3.0-dev
+
+Этап 4: operator check profiles, private snapshot execution, timeout/cancel/process groups, bounded durable logs, go test JSON evidence, exact baseline/candidate comparison и привязка AC к fixture_digest; readiness и независимый human review.
+
+Этап 5: OpenAI-compatible Qwen adapter, явный protocol probe, пять изолированных role contexts, фиксированный DAG, до двух research workers, deterministic integrator, registered checks и independent reviewer. Durable attempts/leases/heartbeat, recovery после restart, bounded context/call budgets, resume после candidate checkpoint без повторного patch. Реальный Qwen не настроен по решению пользователя; проверен детерминированный HTTP stub.
+
+Этап 6: pinned release plan/apply/rollback, atomic invalidation barrier, three-way task rebase и явные resolutions/dirty-overlay policies, provenance/history, human requirements reconfirmation. Consistent backup, verified restore в новый каталог, staged local bundle upgrade с checksum/API/schema checks и offline daemon smoke, ручная активация/rollback до новой работы.
+
+Контракты, команды, конфигурация и реальные ограничения — [EXECUTION.md](EXECUTION.md). Выпущенные migrations 001/002 не изменены; добавлена 003. Pilot readiness остаётся false: реальный Qwen/GigaCode, Docker backend, предметные extractors, incremental/FTS5/full dynamic graph и приёмка на продукте остаются отдельной работой. Нет произвольного scheduler, автоматического COMPLETED, auto-checkout, in-place runtime replacement или технического SEAI-only sandbox для GigaCode.
+
+---
+
+# Исторический статус реализации 0.2.0-dev
 
 Рабочий путь: CLI → daemon → snapshots/CAS → AST/types/refs/calls/literal search → ChangeSpec/plan/approval → изолированный candidate → diff/diagnostic export. Контракты и команды — [WORKFLOW.md](WORKFLOW.md).
 

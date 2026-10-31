@@ -1,0 +1,7 @@
+{
+  "schema_version": "seai.runtime/v1",
+  "checks": [],
+  "max_workers": 2,
+  "max_node_attempts": 1,
+  "max_run_seconds": 1800
+}

@@ -52,11 +52,16 @@
       ]
     },
     "release_readiness": {
-      "const": "NOT_REVIEW_READY"
+      "enum": [
+        "NOT_REVIEW_READY",
+        "REVIEW_READY"
+      ]
     },
     "checks": {
-      "type": "array",
-      "maxItems": 0
+      "type": [
+        "object",
+        "null"
+      ]
     },
     "changed_paths": {
       "type": "array",

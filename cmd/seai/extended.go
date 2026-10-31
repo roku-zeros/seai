@@ -22,6 +22,9 @@ type extendedOptions struct {
 }
 
 func parseExtended(args []string) (string, application.Params, extendedOptions, error) {
+	if isRuntime(args) {
+		return parseRuntime(args)
+	}
 	var p application.Params
 	var o extendedOptions
 	method := ""
@@ -97,8 +100,8 @@ func parseExtended(args []string) (string, application.Params, extendedOptions, 
 				o.mutation = true
 			case "diff":
 				method = "task.diff"
-			case "approve":
-				method = "human.approve"
+			case "approve", "review", "requirements":
+				method = "human." + sub
 				o.mutation = true
 				o.human = true
 			default:
@@ -167,7 +170,7 @@ func parseExtended(args []string) (string, application.Params, extendedOptions, 
 		addFlags("plan")
 	case "patch.apply":
 		addFlags("patch")
-	case "human.approve":
+	case "human.approve", "human.review", "human.requirements":
 		addFlags("actor", "behavior-digest")
 	case "task.export":
 		addFlags("output", "format", "allow-incomplete")
@@ -255,7 +258,7 @@ func parseExtended(args []string) (string, application.Params, extendedOptions, 
 	}
 	return method, p, o, nil
 }
-func approve(ctx context.Context, socket string, p application.Params) int {
+func approve(ctx context.Context, socket string, p application.Params, method string) int {
 	if p.Actor == "" {
 		fmt.Fprintln(os.Stderr, "--actor required; approval must be performed by the human, not the model")
 		return 2
@@ -273,10 +276,18 @@ func approve(ctx context.Context, socket string, p application.Params) int {
 	if json.Unmarshal(raw, &t) != nil {
 		return 4
 	}
-	if p.Digest == "" {
-		p.Digest = t.BehaviorDigest
+	expected := t.BehaviorDigest
+	if method == "human.review" {
+		if t.CheckSummary["checks_passed"] != true {
+			fmt.Fprintln(os.Stderr, "current product checks must pass first")
+			return 3
+		}
+		expected, _ = t.CheckSummary["review_digest"].(string)
 	}
-	if p.Digest != t.BehaviorDigest {
+	if p.Digest == "" {
+		p.Digest = expected
+	}
+	if p.Digest != expected {
 		fmt.Fprintln(os.Stderr, "behavior digest does not match task")
 		return 3
 	}
@@ -290,14 +301,14 @@ func approve(ctx context.Context, socket string, p application.Params) int {
 	for _, c := range t.Spec.Criteria {
 		fmt.Fprintf(tty, "%q: %q\n", c.ID, c.Expected)
 	}
-	challenge := "approve " + t.Alias + " " + t.BehaviorDigest
-	fmt.Fprintf(tty, "Behavior digest: %s\nType exactly: %s\n> ", t.BehaviorDigest, challenge)
+	challenge := method + " " + t.Alias + " " + expected
+	fmt.Fprintf(tty, "Candidate: %s\nDecision digest: %s\nType exactly: %s\n> ", t.Candidate, expected, challenge)
 	line, e := bufio.NewReader(tty).ReadString('\n')
 	if e != nil || strings.TrimSpace(line) != challenge {
 		fmt.Fprintln(os.Stderr, "approval declined")
 		return 3
 	}
-	env, e = transports.HumanApproval(ctx, socket, p)
+	env, e = transports.HumanDecision(ctx, socket, method, p)
 	if e != nil {
 		fmt.Fprintln(os.Stderr, e)
 		return 4

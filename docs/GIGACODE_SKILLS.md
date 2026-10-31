@@ -9,8 +9,8 @@
 | seai-connect | Подключить runtime, проверить root, обновить индекс | doctor/status/index/job |
 | seai-research | Вопросы о функциях, типах, правилах и тестах | search + evidence + ограничения |
 | seai-plan | Составить план изменения по источникам | План в ответе, без применения |
-| seai-change | Исправить, реализовать, рефакторить, добавить тесты | Контракт/approval/preconditions → изолированный candidate; checks пока нет |
-| seai-review | Проверить определения и task diff | Источники baseline/candidate; terminal test verdict отсутствует |
+| seai-change | Change/refactor through SEAI | Contract/approval/preconditions -> candidate -> registered checks |
+| seai-review | Review task diff through SEAI | Current check reports, AC coverage and independent review |
 
 В `.gigacode/seai/POLICY.md` указаны точные разрешённые CLI-команды, freshness guards и правила источников. `GIGACODE.md` загружает политику постоянно, чтобы она действовала и тогда, когда модель не выбрала отдельный skill. Управляющие документы можно читать напрямую; исходники исследуемого проекта, тесты и build-файлы доступны агенту только из JSON SEAI. Наличие test symbol не означает успешный test run.
 
@@ -27,7 +27,7 @@ python3 scripts/install_gigacode_skills.py \
   --data /absolute/path/seai-runtime
 ```
 
-Нужно указать фактические absolute пути. `--project` должен быть Git root. Установщик не индексирует и не читает product code. Он копирует skills/policy, записывает `.gigacode/seai/session.json`, добавляет свой блок к GIGACODE.md и правило игнорирования session.json. Существующие инструкции сохраняются, отличающиеся managed-файлы вызывают ошибку до записи изменений. Пользовательские конфликты надо объединить вручную; молчаливого overwrite нет. Повторная установка того же набора идемпотентна. При переходе с 0.1 на 0.2 изменённые managed skill/policy файлы будут конфликтовать: установщик не делает force overwrite. Сохрани свои дополнения и объедини новый набор с установленным; внутри checkout SEAI обновление tracked skills приходит обычным git pull. session.json содержит только локальные пути, не credentials; он исключён из Git.
+Нужно указать фактические absolute пути. `--project` должен быть Git root. Установщик не индексирует и не читает product code. Он копирует skills/policy, записывает `.gigacode/seai/session.json`, добавляет свой блок к GIGACODE.md и правило игнорирования session.json. Существующие инструкции сохраняются, отличающиеся managed-файлы вызывают ошибку до записи изменений. Пользовательские конфликты надо объединить вручную; молчаливого overwrite нет. Повторная установка того же набора идемпотентна. При переходе между версиями, включая 0.2 → 0.3, изменённые managed skill/policy файлы будут конфликтовать: установщик не делает force overwrite. Сохрани свои дополнения и объедини новый набор с установленным; внутри checkout SEAI обновление tracked skills приходит обычным git pull. session.json содержит только локальные пути, не credentials; он исключён из Git.
 
 CLI layout по умолчанию — `.gigacode/skills/`. Для VS Code используй дополнительный аргумент `--layout vscode`: skills попадут в `.gigacode_vsc/skills/`, управляющая политика/config останутся в `.gigacode/seai/`. Если клиент не подхватил память автоматически, явно прикрепи GIGACODE.md и POLICY.md и проверь результат. Глобальные personal skills и настройки разрешений клиента установщик не меняет.
 
@@ -76,12 +76,12 @@ python3 seai/scripts/install_gigacode_skills.py \
 
 Ожидается чтение только session/skill/policy metadata, затем seai doctor/project status и SEAI source queries. Native read/rg/IDE source search означают нарушение режима. Если runtime недоступен, ожидается сообщение о подключении, а не fallback к исходникам.
 
-В 0.2 доступны task/spec/plan/patch/diff/export по [WORKFLOW.md](WORKFLOW.md). Применение требует scope, before/after hashes и подтверждения человеком для change. Product checks ещё отсутствуют: агент сообщает BLOCKED_BY_SEAI_CAPABILITY для них и не объявляет REVIEW_READY.
+В 0.3 доступны task/spec/plan/patch/diff/export, registered checks, Qwen workers и release/maintenance; см. [EXECUTION.md](EXECUTION.md). Readiness берётся из task status. Qwen остаётся ненастроенным до настройки оператора.
 
 В checkout самого SEAI доступны /seai:setup и /seai:ask как необязательные shortcuts. Они не нужны для каждого обычного вопроса. В отдельный workspace установщик переносит skills/policy/session и постоянное правило, а не shortcuts.
 
 ## Проверка соблюдения режима
 
-Для поиска должны быть видны вызовы seai doctor/project/index/search и JSON-источники, без native file read/rg/git grep. Задай вопрос о неизвестном символе: ожидается gap/уточнение, а не чтение дерева. Попроси исправление: ожидаются task/spec/plan и patch apply в candidate, а не native edit. Подтверждение change делает человек, модель не вызывает approve. Попроси подтвердить тесты: ожидается отсутствие terminal run evidence, а не прямой go test.
+Для поиска должны быть видны вызовы seai doctor/project/index/search и JSON-источники, без native file read/rg/git grep. Задай вопрос о неизвестном символе: ожидается gap/уточнение, а не чтение дерева. Попроси исправление: ожидаются task/spec/plan и patch apply в candidate, а не native edit. Подтверждение change делает человек, модель не вызывает approve. Проверки выполняются через task verify и run status/logs. Если профилей нет, агент сообщает gap без прямого go test.
 
 Если нужны гарантии, а не следование промпту, потребуется отдельно проверенный профиль прав GigaCode: закрыть direct read/edit/search и исполнение произвольного shell, оставив только контролируемые обращения к SEAI. В текущей поставке такого профиля и broker/MCP нет; не включай непроверенный deny-конфиг с неизвестными именами tools. При полном запрете terminal потребуется реализовать иной transport к SEAI. Skills сами этих технических ограничений не устанавливают.
