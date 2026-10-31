@@ -19,7 +19,9 @@ python3 scripts/install_gigacode_skills.py \
   --data /absolute/path/seai-runtime
 ```
 
-После установки перезапусти GigaCode CLI, проверь `/skills` и `/memory`. Можно написать: «Изучай код только через SEAI и объясни функцию Eligible». Для первоначальной установки самого инструмента есть [отдельный runbook](docs/AGENT_QUICKSTART.md). `/seai:setup` и `/seai:ask` в checkout SEAI теперь подключают установленный daemon и исследуют код в том же режиме.
+Если GigaCode открыт в общей папке, где рядом лежат проект и seai, добавь `--workspace /absolute/path/common-folder`: постоянное правило и skills будут установлены в корень открытой папки, а --project останется Git root анализируемого кода. Проверка: `python3 scripts/install_gigacode_skills.py --check --workspace /absolute/path/common-folder --project /absolute/path/strategies --probe`.
+
+После установки запусти новую GigaCode CLI-сессию из указанного workspace, проверь `/skills` и `/memory`. Затем можно писать обычное «Объясни функцию Eligible» — повторять «используй SEAI» в каждом запросе не требуется правилом. Для первоначальной установки самого инструмента есть [отдельный runbook](docs/AGENT_QUICKSTART.md). `/seai:setup` и `/seai:ask` в checkout SEAI теперь подключают установленный daemon и исследуют код в том же режиме.
 
 Через SEAI доступны file/symbol reads, literal text search, typed refs/static calls, связанные тесты, ChangeSpec/plan, интерактивное подтверждение человеком, candidate patches и diff/export. [Новые команды и ограничения](docs/WORKFLOW.md). Product checks ещё отсутствуют, поэтому export только диагностический с NOT_REVIEW_READY. GigaCode на конкретной машине и native MCP пока не проверены/не реализованы.
 

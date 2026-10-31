@@ -33,17 +33,52 @@ CLI layout по умолчанию — `.gigacode/skills/`. Для VS Code ис�
 
 Перезапусти GigaCode. В CLI проверь `/skills` (пять имён) и `/memory` (GIGACODE.md/политика). Для IDE проверь список Skills и подключённые project instructions. Формат и размещение взяты из [CLI skills](https://gitverse.ru/docs/ai/ai-assistant-gigacode/gigacode-cli/skills), [memory](https://gitverse.ru/docs/ai/ai-assistant-gigacode/gigacode-cli/memory), [VS Code skills](https://gitverse.ru/docs/ai/ai-assistant-gigacode/gigacode-for-vscode/skills). Реальная совместимость конкретной корпоративной версии не заявляется.
 
-## Как спрашивать
+## Автоматическое использование без слов «через SEAI»
+
+Skills выбираются моделью, поэтому они не должны быть единственным носителем обязательного правила. Постоянный GIGACODE.md теперь прямо требует: для любого запроса о коде сначала подключиться к SEAI по session.json, затем выбрать workflow. Пользователь не обязан каждый раз упоминать инструмент. Для CLI важно, чтобы правило лежало в папке **запуска текущей сессии**, а не только внутри дочернего checkout SEAI.
+
+Если структура такая:
 
 ```text
-Работай с кодом только через SEAI. Проверь подключение,
-обнови индекс и объясни Eligible. Покажи evidence и snapshot ID.
-Если SEAI не даёт нужной операции, сообщи gap и не обходи его.
+workspace/              ← отсюда запускается gigacode
+  my-project/           ← Git root анализируемого проекта
+  seai/                 ← checkout инструмента
 ```
 
-Skills выбираются моделью по description. Следующие запросы активируют разные процессы: «Подключи SEAI», «Почему Eligible отклоняет запрос?», «Составь план изменения», «Исправь правило», «Проверь эту функцию». В 0.2 доступны task/spec/plan/patch/diff/export по [WORKFLOW.md](WORKFLOW.md). Применение требует scope, before hashes и подтверждения человеком для change. Product checks всё ещё отсутствуют: для них агент сообщает `BLOCKED_BY_SEAI_CAPABILITY`, не обходит инструмент и не объявляет REVIEW_READY. Это статус ответа агента, не реализованная RPC-ошибка.
+устанавливай так из workspace:
 
-В checkout самого SEAI доступны также `/seai:setup` и `/seai:ask` как prompt shortcuts. В отдельный target проект установщик переносит skills/policy/session, а не shortcuts; там можно задавать обычные вопросы после проверки `/skills`.
+```sh
+python3 seai/scripts/install_gigacode_skills.py \
+  --workspace "$PWD" \
+  --project "$PWD/my-project" \
+  --seai "$PWD/seai/build/seai" \
+  --data /absolute/path/existing-runtime
+```
+
+Укажи реальное имя my-project и тот runtime, для которого уже запущен daemon. В workspace появятся GIGACODE.md и .gigacode/skills/seai-*, а session.json будет указывать на **my-project**, не на общую папку. Сам workspace не обязан быть Git-репозиторием. Существующие инструкции дочернего проекта установщик не изменяет. Без --workspace сохраняется прежнее поведение: установка в --project, и CLI нужно запускать именно оттуда.
+
+Проверка размещения без изменений файлов:
+
+```sh
+python3 seai/scripts/install_gigacode_skills.py \
+  --check --workspace "$PWD" --project "$PWD/my-project"
+```
+
+Добавь `--probe`, чтобы также вызвать doctor/project status через настроенный SEAI и сравнить daemon root. Проверка не индексирует код и не выбирает другой runtime. Exit 3 означает ошибки настройки, exit 0 — ожидаемые файлы на месте (и probe успешен, если запрошен). Наличие правил только в дочерних папках диагностируется как NESTED_RULE_IS_NOT_WORKSPACE_RULE. Проверяется именно выбранный --layout, поэтому VS Code skills не считаются установленными CLI skills.
+
+`client_loaded_verified=false` в отчёте принципиален: файловая проверка не доказывает, что GigaCode загрузил инструкции или соблюдает их. После установки заверши старую CLI-сессию, запусти новую из workspace, проверь /memory на **workspace/GIGACODE.md** и /skills на пять skills. Не ограничивайся вопросом модели «какие правила ты знаешь»: проверь реально загруженные файлы и tool calls.
+
+Затем задай обычный вопрос без подсказки про SEAI:
+
+```text
+Объясни структуру проекта и найди функцию обработки заявки.
+```
+
+Ожидается чтение только session/skill/policy metadata, затем seai doctor/project status и SEAI source queries. Native read/rg/IDE source search означают нарушение режима. Если runtime недоступен, ожидается сообщение о подключении, а не fallback к исходникам.
+
+В 0.2 доступны task/spec/plan/patch/diff/export по [WORKFLOW.md](WORKFLOW.md). Применение требует scope, before/after hashes и подтверждения человеком для change. Product checks ещё отсутствуют: агент сообщает BLOCKED_BY_SEAI_CAPABILITY для них и не объявляет REVIEW_READY.
+
+В checkout самого SEAI доступны /seai:setup и /seai:ask как необязательные shortcuts. Они не нужны для каждого обычного вопроса. В отдельный workspace установщик переносит skills/policy/session и постоянное правило, а не shortcuts.
 
 ## Проверка соблюдения режима
 

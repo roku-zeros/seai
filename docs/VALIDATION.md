@@ -67,3 +67,7 @@ Prompt shortcuts проверены на наличие file injection, descript
 ## SEAI-only skills
 
 30 октября 2026: пять SKILL.md прошли quick_validate.py skill-creator (frontmatter/имена/описания/scaffold). Пять component tests установщика PASS: сохранность пользовательской памяти и ignore-файла, идемпотентность, отсутствие частичной установки при конфликте, сохранность отредактированной managed-политики, Git root/runtime guards, VS Code layout и отказ на symlink destination. Проверка модели в реальном GigaCode не выполнялась; policy не является техническим ограничением native tools. Go backend не менялся.
+
+## Область автоподключения GigaCode CLI
+
+Проверены 11 Python tests установщика/диагностики: сохранение прежних пяти сценариев, отдельный parent workspace над Git-проектом, правила и skills в открытом корне, сохранность дочернего GIGACODE.md, idempotency, диагностика открытия неправильной папки, недопустимый workspace, различение CLI/VS Code layouts, проверка daemon root и CLI exit 3 для некорректного размещения. Проверяется установленный файловый контракт; фактическая загрузка памятью GigaCode и поведение модели без явного промпта не заявляются проверенными. Go runtime/протокол не менялись.

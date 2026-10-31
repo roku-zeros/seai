@@ -9,7 +9,7 @@ installer = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(installer)
 
 
-class InstallTests(unittest.TestCase):
+class InstallFixture:
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -25,6 +25,8 @@ class InstallTests(unittest.TestCase):
     def install(self, layout="cli"):
         return installer.install(self.project, self.binary, self.data, layout)
 
+
+class InstallTests(InstallFixture, unittest.TestCase):
     def test_preserves_user_memory_and_is_idempotent(self):
         memory = self.project / "GIGACODE.md"
         memory.write_text("User instructions\n")
@@ -75,6 +77,57 @@ class InstallTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.install()
         self.assertEqual(memory.read_bytes(), before)
+
+class WorkspaceTests(InstallFixture, unittest.TestCase):
+    def test_parent_workspace_installs_startup_rule_at_opened_root(self):
+        original = self.project / "GIGACODE.md"
+        original.write_text("Child project instructions\n")
+        result = installer.install(self.project, self.binary, self.data, "cli", self.base)
+        self.assertEqual(result["workspace"], str(self.base.resolve()))
+        self.assertTrue((self.base / "GIGACODE.md").is_file())
+        self.assertFalse((self.project / ".gigacode").exists())
+        self.assertEqual(original.read_text(), "Child project instructions\n")
+        self.assertEqual(len(list((self.base / ".gigacode/skills").glob("*/SKILL.md"))), 5)
+        self.assertEqual(installer.install(self.project, self.binary, self.data, "cli", self.base)["written"], [])
+        status = installer.check(self.base, self.project)
+        self.assertEqual(status["status"], "files_configured")
+        self.assertEqual(status["project"], str(self.project.resolve()))
+        self.assertFalse(status["client_loaded_verified"])
+
+    def test_opening_parent_of_existing_project_setup_is_diagnosed(self):
+        self.install()
+        status = installer.check(self.base, self.project)
+        self.assertEqual(status["status"], "issues_found")
+        self.assertIn("NESTED_RULE_IS_NOT_WORKSPACE_RULE", {i["code"] for i in status["issues"]})
+        self.assertFalse((self.base / "GIGACODE.md").exists())
+
+    def test_workspace_must_contain_selected_project(self):
+        outside = self.base / "unrelated"
+        outside.mkdir()
+        with self.assertRaises(ValueError):
+            installer.install(self.project, self.binary, self.data, "cli", outside)
+        self.assertFalse((outside / "GIGACODE.md").exists())
+
+    def test_check_requires_the_selected_client_layout(self):
+        self.install("vscode")
+        self.assertEqual(installer.check(self.project, layout="vscode")["status"], "files_configured")
+        status = installer.check(self.project, layout="cli")
+        self.assertIn("INCOMPLETE_SKILL_SET", {i["code"] for i in status["issues"]})
+
+    def test_probe_rejects_daemon_for_another_project(self):
+        import json
+        self.binary.write_text("#!/usr/bin/env python3\nimport json,sys\nprint(json.dumps({'schema_version':'seai.api/v1','status':'ok','data':{'root':'/different/project'}}))\n")
+        self.install()
+        status = installer.check(self.project, probe=True)
+        self.assertIn("DAEMON_PROJECT_MISMATCH", {i["code"] for i in status["issues"]})
+
+    def test_cli_check_exit_code_reports_wrong_opened_directory(self):
+        import sys
+        import json
+        self.install()
+        result = subprocess.run([sys.executable, str(installer.SOURCE / "scripts/install_gigacode_skills.py"), "--check", "--workspace", str(self.base), "--project", str(self.project)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 3)
+        self.assertEqual(json.loads(result.stdout)["status"], "issues_found")
 
 
 if __name__ == "__main__":
