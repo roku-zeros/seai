@@ -5,6 +5,8 @@ description: Применять ограниченные изменения Go-�
 
 # Изменение только через SEAI
 
+Если доступны `seai_connect` и `seai_read`, используй MCP вместо shell-команд. Подключение фиксирует generation для чтений; `task.get` через MCP возвращает сохранённые данные с freshness=UNKNOWN. Если доступен `seai_candidate`, отправляй create/revise/plan/patch асинхронно и опрашивай `runs.get` по run_id. Не повторяй отправку при таймауте: используй тот же operation_id или проверяй run. MCP не предоставляет human approval и не заменяет настройки check profiles. Ниже — эквивалентный CLI fallback для установок без MCP.
+
 Соблюдай `.gigacode/seai/POLICY.md`. Используй task/spec/plan из seai-plan. Проверь `task status ID`, freshness и состояние. Для change требуется человеческое решение по точному behavior digest: выведи человеку команду `seai --data DATA task approve ID --actor ACTOR`; сам её не выполняй, не вызывай private route и не эмулируй ввод/PTY. При изменении контракта прежнее approval может быть снято. Не называй бизнес-изменение refactor ради обхода решения.
 
 1. Читай текущие bytes/mode/hash через `read PATH --snapshot CANDIDATE_ID`, а не native file read. Candidate после предыдущего patch отличается от baseline; typed graph пока относится к baseline.

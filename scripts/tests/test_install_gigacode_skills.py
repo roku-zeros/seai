@@ -132,3 +132,22 @@ class WorkspaceTests(InstallFixture, unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class UpgradeTests(InstallFixture, unittest.TestCase):
+    def test_explicit_upgrade_backs_up_managed_files_and_preserves_user_text(self):
+        self.install()
+        memory = self.project / "GIGACODE.md"
+        original = memory.read_text().replace("## SEAI-only", "## Older SEAI policy") + "\nUser tail\n"
+        memory.write_text(original)
+        skill = self.project / ".gigacode/skills/seai-connect/SKILL.md"
+        old_skill = "older managed skill"
+        skill.write_text(old_skill)
+        with self.assertRaises(ValueError):
+            self.install()
+        result = installer.install(self.project, self.binary, self.data, "cli", upgrade=True)
+        self.assertTrue(memory.read_text().endswith("\nUser tail\n"))
+        backups = [self.project / p for p in result["backups"]]
+        self.assertIn(original, [p.read_text() for p in backups])
+        self.assertIn(old_skill, [p.read_text() for p in backups])
+        self.assertIn("seai_connect", skill.read_text())
+        self.assertEqual(installer.install(self.project, self.binary, self.data, "cli", upgrade=True)["written"], [])

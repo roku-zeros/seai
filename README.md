@@ -1,6 +1,8 @@
 # SEAI — начало реализации на Go
 
-Рабочий фундамент по [спецификации v1](docs/specification-v1.md). Версия `0.4.1-dev`: исследование → контракт → candidate → зарегистрированные проверки/review; Qwen workers, release rebase и backup/restore/подготовка upgrade. Это ещё не готовый пилот.
+**GigaCode: медленно и много подтверждений?** В 0.4.2 добавлен прямой stdio MCP: чтения закрепляют индекс автоматически и обходятся без shell. Настройка доверия ограничена SEAI; команды создания/планирования/патча поддерживают async receipt. [Установка MCP и обновление существующей установки](docs/GIGACODE_MCP.md).
+
+Рабочий фундамент по [спецификации v1](docs/specification-v1.md). Версия `0.4.2-dev`: исследование → контракт → candidate → зарегистрированные проверки/review; Qwen workers, release rebase и backup/restore/подготовка upgrade. Это ещё не готовый пилот.
 
 Реализованы два бинарника: CLI `seai` и единственный writer `seaid`. CLI обращается к daemon через Unix socket и JSON-RPC 2.0 с handshake `seai.api/v1`. Daemon сохраняет задания в SQLite (WAL, foreign keys, synchronous FULL), снимает исходники Git в SHA-256 CAS, строит отдельный индекс AST/types через `go/packages` и транзакционно публикует готовое поколение вместе с событием и результатом задания. Поиск точных идентификаторов и подстрок возвращает evidence из сохранённых байтов, а не из текущего checkout.
 
@@ -23,7 +25,7 @@ python3 scripts/install_gigacode_skills.py \
 
 После установки запусти новую GigaCode CLI-сессию из указанного workspace, проверь `/skills` и `/memory`. Затем можно писать обычное «Объясни функцию Eligible» — повторять «используй SEAI» в каждом запросе не требуется правилом. Для первоначальной установки самого инструмента есть [отдельный runbook](docs/AGENT_QUICKSTART.md). `/seai:setup` и `/seai:ask` в checkout SEAI теперь подключают установленный daemon и исследуют код в том же режиме.
 
-Через SEAI доступны file/symbol reads, literal text search, typed refs/static calls, связанные тесты, ChangeSpec/plan, интерактивное подтверждение человеком, candidate patches и diff/export. [Новые команды и ограничения](docs/WORKFLOW.md). Проверки настраивает оператор; без профилей и независимого review export остаётся диагностическим. [Команды этапов 4–6](docs/EXECUTION.md). GigaCode на конкретной машине и native MCP пока не проверены/не реализованы.
+Через SEAI доступны file/symbol reads, literal text search, typed refs/static calls, связанные тесты, ChangeSpec/plan, интерактивное подтверждение человеком, candidate patches и diff/export. [Новые команды и ограничения](docs/WORKFLOW.md). Проверки настраивает оператор; без профилей и независимого review export остаётся диагностическим. [Команды этапов 4–6](docs/EXECUTION.md). Stdio MCP реализован и проверен на локальном fixture; фактический клиент GigaCode на вашей машине ещё требует проверки.
 
 ## Исправления для большого проекта
 
@@ -95,13 +97,13 @@ make smoke
 
 Реализованы paged reads из CAS, определения Go AST/types, локальные typed references, static/possible/unresolved calls и direct related tests. Текстовый поиск literal по строкам/chunks; FTS5/reranker и полный dynamic graph не реализованы. Coverage остаётся partial, конкретные type/load diagnostics видны; baseline с type errors блокирует patch.
 
-Текущие source reads проверяют live freshness. Для исторического generation/snapshot требуется явный ID. При неизменном generation повторный index build не повышает epoch; новый generation делает старые задачи stale. Устаревшие task baselines нужно будет переносить через release reconciliation, пока оно не реализовано.
+Текущие source reads проверяют live freshness. Для исторического generation/snapshot требуется явный ID. При неизменном generation повторный index build не повышает epoch; новый generation делает старые задачи stale. Для устаревших task baselines доступен release reconciliation/task rebase по EXECUTION.md.
 
 ChangeSpec/plan/candidate/решения и successful operation results сохраняются в runtime migration 002. Patch не изменяет основной checkout и требует scope/preconditions/ревизии/approval для behavior changes. Зарегистрированные checks и независимый human/model review могут дать REVIEW_READY; без этих доказательств экспорт требует --allow-incomplete. [Подробный протокол](docs/WORKFLOW.md).
 
 Single-module offline profile: GOPROXY=off, GOSUMDB=off, GOTOOLCHAIN=local, GOWORK=off, CGO_ENABLED=0, GOPACKAGESDRIVER=off. Symlink/submodule, go.work и local replace неподдержаны. Generated code не запускается. Исключены .git/.seai/vendor/.env/*.key по snapshot policy; retention/GC/ACL/квоты и staged provenance не завершены.
 
-Qwen/workers, product runner, domain extractors, incremental index, MCP/broker, release rebase и backup/restore остаются следующими этапами. `pilot_ready=false`. Skills — инструкции, не sandbox. Интерактивное CLI approval не является аутентификацией против другого процесса того же OS user.
+Qwen/workers, product runner, настраиваемые Go business adapters, stdio MCP, release rebase и backup/restore реализованы в пределах описанных ограничений. Полное покрытие предметной области, incremental/FTS index и проверка реального GigaCode/Qwen остаются следующими этапами. `pilot_ready=false`. Skills — инструкции, не sandbox. Интерактивное CLI approval не является аутентификацией против другого процесса того же OS user.
 
 ## Проверка
 

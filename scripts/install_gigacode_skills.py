@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Install SEAI-only instructions in a selected project without replacing user files."""
 import argparse
+from datetime import datetime, timezone
+import shutil
 import json
 import os
 from pathlib import Path
@@ -10,7 +12,7 @@ import sys
 SOURCE = Path(__file__).resolve().parents[1]
 
 
-def install(project, binary, data, layout, workspace=None):
+def install(project, binary, data, layout, workspace=None, upgrade=False):
     project = Path(project).resolve(strict=True)
     root = subprocess.check_output(
         ["git", "-C", str(project), "rev-parse", "--show-toplevel"], text=True
@@ -46,8 +48,10 @@ def install(project, binary, data, layout, workspace=None):
         if old.count(begin) != 1 or old.count(end) != 1:
             raise ValueError("malformed SEAI policy markers in GIGACODE.md")
         a, b = old.index(begin), old.index(end) + len(end)
-        if a > b or old[a:b] != block.strip():
+        if a > b or (old[a:b] != block.strip() and not upgrade):
             raise ValueError("existing SEAI policy differs; merge GIGACODE.md manually")
+        if upgrade:
+            planned[memory] = (old[:a] + block.strip() + old[b:]).encode()
     else:
         planned[memory] = (old + ("\n\n" if old else "") + block).encode()
     ignore = workspace / ".gitignore"
@@ -57,22 +61,35 @@ def install(project, binary, data, layout, workspace=None):
     entry = "/.gigacode/seai/session.json"
     if entry not in previous_ignore.splitlines():
         planned[ignore] = (previous_ignore.rstrip("\n") + "\n" + entry + "\n").encode()
+    backup_ignore = "/.gigacode/seai/backups/"
+    ignore_body = planned.get(ignore, previous_ignore.encode()).decode()
+    if backup_ignore not in ignore_body.splitlines():
+        planned[ignore] = (ignore_body.rstrip("\n") + "\n" + backup_ignore + "\n").encode()
     # Check every destination before writing anything; user changes are never replaced.
     for dest, body in planned.items():
         if dest.is_symlink() or any(p.is_symlink() for p in dest.parents if p != workspace and workspace in p.parents):
             raise ValueError("symlink destination is unsupported: " + str(dest))
-        if dest.exists() and dest not in (memory, ignore) and dest.read_bytes() != body:
+        if dest.exists() and dest not in (memory, ignore) and dest.read_bytes() != body and not upgrade:
             raise ValueError("destination differs; merge manually: " + str(dest))
+    backup_root = workspace / ".gigacode/seai/backups" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     written = []
+    backups = []
     for dest, body in planned.items():
         if dest.exists() and dest.read_bytes() == body:
             continue
+        if upgrade and dest.exists():
+            backup = backup_root / dest.relative_to(workspace)
+            if any(p.is_symlink() for p in backup.parents):
+                raise ValueError("symlink backup destination is unsupported")
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(dest, backup)
+            backups.append(str(backup.relative_to(workspace)))
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(body)
         if dest.name == "session.json":
             dest.chmod(0o600)
         written.append(str(dest.relative_to(workspace)))
-    return {"project": str(project), "workspace": str(workspace), "layout": layout, "written": written,
+    return {"project": str(project), "workspace": str(workspace), "layout": layout, "written": written, "backups": backups,
             "note": "Start GigaCode from workspace, restart the session, then check /memory and /skills. Installed files do not prove that the client loaded them."}
 
 
@@ -148,6 +165,7 @@ def check(workspace, project=None, probe=False, layout="cli"):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--upgrade", action="store_true", help="explicitly update managed SEAI skills/policy with backups; preserve text outside managed GIGACODE.md block")
     p.add_argument("--project")
     p.add_argument("--workspace", help="directory opened in GigaCode; defaults to project")
     p.add_argument("--check", action="store_true", help="diagnose startup files without modifying them")
@@ -167,7 +185,7 @@ def main():
             p.error("installation requires --project, --seai and --data")
         if a.probe:
             p.error("--probe requires --check")
-        print(json.dumps(install(a.project, a.seai, a.data, a.layout, a.workspace), indent=2))
+        print(json.dumps(install(a.project, a.seai, a.data, a.layout, a.workspace, a.upgrade), indent=2))
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         print("SEAI skills installation failed: " + str(error), file=sys.stderr)
         return 2

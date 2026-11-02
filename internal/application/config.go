@@ -8,6 +8,7 @@ import (
 	"seai.local/seai/internal/contracts"
 	"seai.local/seai/internal/domain"
 	"seai.local/seai/internal/providers/qwen"
+	"time"
 )
 
 func (s *Service) Configure(path string) error {
@@ -26,6 +27,9 @@ func (s *Service) Configure(path string) error {
 	}
 	if c.Schema != "seai.runtime/v1" || c.MaxWorkers < 1 || c.MaxWorkers > 2 || c.MaxNodeAttempts < 1 || c.MaxNodeAttempts > 2 || c.MaxRunSeconds < 1 || c.MaxRunSeconds > 7200 {
 		return domain.Err("SCHEMA_INVALID", "runtime configuration bounds invalid")
+	}
+	if c.FreshnessBudgetSeconds < 0 || c.FreshnessBudgetSeconds > 1800 {
+		return domain.Err("SCHEMA_INVALID", "freshness_budget_seconds must be 0 (default) or 1..1800")
 	}
 	if e := business.Validate(c.Business); e != nil {
 		return e
@@ -53,6 +57,10 @@ func (s *Service) Configure(path string) error {
 	b, e := json.Marshal(c)
 	if e != nil {
 		return e
+	}
+	s.FreshnessBudget = DefaultFreshnessBudget
+	if c.FreshnessBudgetSeconds > 0 {
+		s.FreshnessBudget = time.Duration(c.FreshnessBudgetSeconds) * time.Second
 	}
 	s.Config = c
 	s.ConfigDigest = domain.Digest(b)

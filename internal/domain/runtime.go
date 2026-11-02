@@ -44,13 +44,14 @@ type ProviderProfile struct {
 	MaxTaskTokens     int    `json:"max_task_tokens"`
 }
 type RuntimeConfig struct {
-	Business        *BusinessConfig  `json:"business,omitempty"`
-	Schema          string           `json:"schema_version"`
-	Checks          []CheckProfile   `json:"checks"`
-	Provider        *ProviderProfile `json:"provider,omitempty"`
-	MaxWorkers      int              `json:"max_workers"`
-	MaxNodeAttempts int              `json:"max_node_attempts"`
-	MaxRunSeconds   int              `json:"max_run_seconds"`
+	FreshnessBudgetSeconds int              `json:"freshness_budget_seconds,omitempty"`
+	Business               *BusinessConfig  `json:"business,omitempty"`
+	Schema                 string           `json:"schema_version"`
+	Checks                 []CheckProfile   `json:"checks"`
+	Provider               *ProviderProfile `json:"provider,omitempty"`
+	MaxWorkers             int              `json:"max_workers"`
+	MaxNodeAttempts        int              `json:"max_node_attempts"`
+	MaxRunSeconds          int              `json:"max_run_seconds"`
 }
 type CheckResult struct {
 	Domain           *BusinessVerification  `json:"domain_verification,omitempty"`

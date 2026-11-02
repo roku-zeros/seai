@@ -5,6 +5,8 @@ description: Исследовать Go-код через snapshot reads, пои�
 
 # Исследование через SEAI
 
+Если доступны `seai_connect` и `seai_read`, используй MCP вместо shell-команд. Подключение фиксирует generation для чтений; `task.get` через MCP возвращает сохранённые данные с freshness=UNKNOWN. Если доступен `seai_candidate`, отправляй create/revise/plan/patch асинхронно и опрашивай `runs.get` по run_id. Не повторяй отправку при таймауте: используй тот же operation_id или проверяй run. MCP не предоставляет human approval и не заменяет настройки check profiles. Ниже — эквивалентный CLI fallback для установок без MCP.
+
 Соблюдай `.gigacode/seai/POLICY.md`. Подключение проверяется seai-connect; нужны explicit пути и правильный root. Для current reads требуется свежий индекс. Сохрани IDs из index build и для запросов одной версии передавай --generation или --snapshot явно. Это immutable чтение выбранной версии; после изменения кода нужна новая индексация, старые IDs не доказывают live freshness.
 
 - Выдели имена и используй `search NAME`. Если имя неизвестно, можно `files --prefix ...` и `search "literal text" --text`; это не семантический поиск по русскому вопросу.

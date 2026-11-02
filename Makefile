@@ -1,4 +1,4 @@
-.PHONY: build test vet smoke business-smoke
+.PHONY: build test vet smoke business-smoke mcp-smoke
 
 build:
 	mkdir -p build
@@ -16,3 +16,6 @@ business-smoke: build
 
 smoke: build
 	python3 scripts/smoke.py --bin build
+
+mcp-smoke: build
+	python3 scripts/mcp_smoke.py --bin build

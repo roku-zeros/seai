@@ -44,9 +44,10 @@ func (s *Service) advanced(ctx context.Context, method string, p Params) (any, e
 		return s.runLogs(ctx, p)
 	case "runs.get":
 		var id, kind, state string
-		var result, errtext sql.NullString
+		var result, errtext, finished sql.NullString
+		var created string
 		var lease int
-		e := s.Store.DB.QueryRowContext(ctx, "SELECT id,kind,state,result_digest,error,lease_epoch FROM runs WHERE id=?", p.ID).Scan(&id, &kind, &state, &result, &errtext, &lease)
+		e := s.Store.DB.QueryRowContext(ctx, "SELECT id,kind,state,result_digest,error,lease_epoch,created_at,finished_at FROM runs WHERE id=?", p.ID).Scan(&id, &kind, &state, &result, &errtext, &lease, &created, &finished)
 		if e == sql.ErrNoRows {
 			return nil, domain.Err("NOT_FOUND", "run not found")
 		}
@@ -54,6 +55,17 @@ func (s *Service) advanced(ctx context.Context, method string, p Params) (any, e
 			return nil, e
 		}
 		out := map[string]any{"run_id": id, "kind": kind, "state": state, "lease_epoch": lease, "error": errtext.String}
+		out["created_at"] = created
+		out["finished_at"] = finished.String
+		if start, err := time.Parse(time.RFC3339Nano, created); err == nil {
+			end := time.Now()
+			if finished.Valid {
+				if parsed, err := time.Parse(time.RFC3339Nano, finished.String); err == nil {
+					end = parsed
+				}
+			}
+			out["elapsed_ms"] = end.Sub(start).Milliseconds()
+		}
 		if result.Valid {
 			b, e := s.Workspace.Objects.Get(result.String)
 			if e != nil {
@@ -136,7 +148,7 @@ func (s *Service) startRun(ctx context.Context, method string, p Params, work ru
 		if e != nil {
 			return nil, e
 		}
-		if method != "task.rebase" {
+		if method != "task.rebase" && method != "workflow.submit" {
 			if e = s.guard(ctx, pin); e != nil {
 				return nil, e
 			}

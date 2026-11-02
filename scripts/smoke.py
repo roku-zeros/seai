@@ -149,7 +149,7 @@ with tempfile.TemporaryDirectory(prefix="seai-smoke-") as tmp:
         run([binaries / "seai", "--data", restored, "backup", "restore", "--from", backup])
         run([binaries / "seaid", "--data", restored, "--check-data"])
         bundle = root / "bundle.json"
-        bundle.write_text(json.dumps(dict(schema_version="seai.upgrade/v1", product_version="0.4.1-dev",
+        bundle.write_text(json.dumps(dict(schema_version="seai.upgrade/v1", product_version=json.loads(run([binaries / "seaid", "--version"]))["product_version"],
             api_version="seai.api/v1", runtime_schema=3,
             seai=str(binaries / "seai"), seai_digest=hashlib.sha256((binaries / "seai").read_bytes()).hexdigest(),
             seaid=str(binaries / "seaid"), seaid_digest=hashlib.sha256((binaries / "seaid").read_bytes()).hexdigest())))

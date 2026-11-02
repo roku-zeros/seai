@@ -1,4 +1,14 @@
-# Статус реализации 0.4.1-dev
+# Статус реализации 0.4.2-dev
+
+Добавлен ограниченный stdio MCP bridge: offline discovery, bundled schemas, project attestation, pinned read queries и optional async candidate workflow. По умолчанию только чтения; human decision, shell, export/release/check execution не экспонируются. Установщик настраивает project-scoped MCP trust отдельно для reads/candidate; глобальные shell permissions не меняются. Обновление skills/policy сохраняет backups и пользовательский текст вне managed block.
+
+Freshness budget задаётся runtime/CLI, отображается doctor. CLI не делает лишний live scan ради expected_revision, available stored status/diff с UNKNOWN. Статическая проверка spec/plan/evidence/approval выполняется до live guard. File/symbol read по умолчанию 64 KiB, text без duplicate base64, UTF-8 boundary validation. Async workflow.submit сохраняет receipt до live check; run status содержит timing; RPC completion logs содержат IDs/duration/code без содержимого запросов. Все прежние mutation guards и отдельное human approval сохранены.
+
+Проверки и реальные ограничения — [VALIDATION.md](VALIDATION.md), инструкция установки — [GIGACODE_MCP.md](GIGACODE_MCP.md). Быстродействие на целевой FS и фактический GigaCode требуют нового пользовательского прогона. Patch builder/full-file export/увеличение payload, field-level JSON diagnostics, FTS/incremental и журнал фаз остаются незавершёнными.
+
+---
+
+# Исторический статус реализации 0.4.1-dev
 
 Исправления по пользовательскому прогону большого Go-проекта: bulk tracked/untracked enumeration, Git cat-file --batch, read-only стабильный Observe для freshness без CAS writes, 15s freshness budget и async workspace check. RPC timeout/cancel/отсутствующий socket различаются; client/daemon RPC budget настраивается. UNKNOWN freshness не становится REVIEW_READY.
 

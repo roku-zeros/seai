@@ -5,6 +5,8 @@ description: Составить и сохранить ChangeSpec и план и�
 
 # Контракт и план через SEAI
 
+Если доступны `seai_connect` и `seai_read`, используй MCP вместо shell-команд. Подключение фиксирует generation для чтений; `task.get` через MCP возвращает сохранённые данные с freshness=UNKNOWN. Если доступен `seai_candidate`, отправляй create/revise/plan/patch асинхронно и опрашивай `runs.get` по run_id. Не повторяй отправку при таймауте: используй тот же operation_id или проверяй run. MCP не предоставляет human approval и не заменяет настройки check profiles. Ниже — эквивалентный CLI fallback для установок без MCP.
+
 Соблюдай `.gigacode/seai/POLICY.md`. Исследуй задачу как seai-research. Для уже существующей задачи сначала `task status ID`, не заменяй её baseline текущим checkout молча.
 
 1. Подготовь JSON/YAML `seai.change/v1`: change_id/spec revision/kind/objective, source_requirements с точным content/revision/SHA-256, scope.files, expected/preserved behavior, acceptance_criteria с behavior IDs/ожиданиями/profile и unresolved. Все коллекции явные массивы. Change требует требования/ожидаемое поведение; refactor требует эквивалентность; explain не даёт права на patch. Не придумывай бизнес-значения и digest источника.

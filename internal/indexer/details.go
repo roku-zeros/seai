@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 	"seai.local/seai/internal/domain"
+	"seai.local/seai/internal/sourcepage"
 	"seai.local/seai/internal/storage"
 )
 
@@ -185,7 +186,7 @@ type TextCursor struct {
 	Offset     int    `json:"offset"`
 }
 
-func TextSearch(ctx context.Context, path, generation, query, cursor string, limit int, cas storage.CAS) (map[string]any, error) {
+func TextSearch(ctx context.Context, path, generation, query, cursor string, limit int, cas storage.CAS, encodings ...string) (map[string]any, error) {
 	if query == "" || len(query) > 512 || strings.ContainsAny(query, "\r\n") || !utf8.ValidString(query) {
 		return nil, domain.Err("SCHEMA_INVALID", "literal single-line UTF-8 query required (1..512 bytes)")
 	}
@@ -239,7 +240,7 @@ func TextSearch(ctx context.Context, path, generation, query, cursor string, lim
 	}
 	return map[string]any{"hits": hits, "next_cursor": next, "truncated": next != "", "mode": "literal-case-sensitive-lines"}, nil
 }
-func Symbol(ctx context.Context, path, id string, offset, limit int, cas storage.CAS) (map[string]any, error) {
+func Symbol(ctx context.Context, path, id string, offset, limit int, cas storage.CAS, encodings ...string) (map[string]any, error) {
 	db, e := sql.Open("sqlite3", readDSN(path))
 	if e != nil {
 		return nil, e
@@ -261,9 +262,19 @@ func Symbol(ctx context.Context, path, id string, offset, limit int, cas storage
 	if offset < 0 || h.Start < 0 || h.End < h.Start || h.End > len(b) || offset > h.End-h.Start {
 		return nil, domain.Err("INVALID_RANGE", "symbol byte range")
 	}
-	start := h.Start + offset
-	end := min(start+limit, h.End)
-	return map[string]any{"symbol": h, "blob_digest": blob, "start_byte": start, "end_byte": end, "content_base64": base64.StdEncoding.EncodeToString(b[start:end]), "text": safeText(b[start:end]), "truncated": end < h.End, "next_offset": end - h.Start}, nil
+	encoding := ""
+	if len(encodings) > 0 {
+		encoding = encodings[0]
+	}
+	page, e := sourcepage.Read(b[h.Start:h.End], offset, limit, encoding)
+	if e != nil {
+		return nil, e
+	}
+	page["symbol"] = h
+	page["blob_digest"] = blob
+	page["start_byte"] = h.Start + offset
+	page["end_byte"] = h.Start + page["end_byte"].(int)
+	return page, nil
 }
 func References(ctx context.Context, path, id string, outgoing, tests bool, offset, limit int) (map[string]any, error) {
 	db, e := sql.Open("sqlite3", readDSN(path))

@@ -32,12 +32,16 @@ func run() error {
 	data := flag.String("data", "", "private runtime directory outside repository")
 	project := flag.String("project", "", "explicit project identity")
 	rpcTimeout := flag.Duration("rpc-timeout", transports.DefaultRPCTimeout, "response write timeout for individual RPCs")
+	freshness := flag.Duration("freshness-budget", 0, "live verification budget, e.g. 5m; 0 uses runtime config/default 15s")
 	config := flag.String("config", "", "operator-owned JSON runtime profiles and optional Qwen configuration")
 	version := flag.Bool("version", false, "print executable compatibility manifest")
 	checkData := flag.Bool("check-data", false, "offline migrate and integrity-check runtime, then exit")
 	flag.Parse()
 	if *rpcTimeout <= 0 || *rpcTimeout > 30*time.Minute {
 		return fmt.Errorf("--rpc-timeout must be >0 and <=30m")
+	}
+	if *freshness < 0 || *freshness > 30*time.Minute {
+		return fmt.Errorf("--freshness-budget must be 0..30m")
 	}
 	if *version {
 		fmt.Println(string(maintenance.VersionJSON()))
@@ -98,6 +102,9 @@ func run() error {
 	if e = s.Configure(*config); e != nil {
 		return e
 	}
+	if *freshness > 0 {
+		s.FreshnessBudget = *freshness
+	}
 	sock := filepath.Join(d, "seaid.sock")
 	if len(sock) > 100 {
 		return fmt.Errorf("socket path too long; choose a shorter --data directory")
@@ -126,7 +133,7 @@ func run() error {
 		defer cancel()
 		_ = server.Shutdown(shutdown)
 	}()
-	log.Printf("seaid 0.4.1-dev project=%s socket=%s", *project, sock)
+	log.Printf("seaid 0.4.2-dev project=%s socket=%s", *project, sock)
 	e = server.Serve(listener)
 	s.CancelRuns()
 	s.Wait()

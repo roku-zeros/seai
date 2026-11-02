@@ -19,7 +19,7 @@ calls <symbol_id>
 tests related <symbol_id>
 ```
 
-Результат index job содержит source_snapshot_id и index_generation_id. Поиск возвращает symbol_id/evidence_id/file_path. Read и symbol — страницы байтов: `content_base64` всегда точен; `text` заполняется только для UTF-8 страницы. Следующую страницу запрашивай по next_offset; truncated означает, что тело не прочитано целиком. File read возвращает также file_evidence_id для привязки целого файла в плане. Файлы доступны только по manifest зарегистрированного снимка, а не по произвольному пути диска/CAS.
+Результат index job содержит source_snapshot_id и index_generation_id. Поиск возвращает symbol_id/evidence_id/file_path. Read и symbol — страницы до 64 KiB по умолчанию. UTF-8 возвращается только в `text`; `--encoding base64` или `--encoding both` явно включает точные байты. Binary автоматически возвращается в base64. UTF-8 страницы не разрезают символ; offset внутри символа отклоняется. Следующую страницу запрашивай по next_offset; truncated означает, что тело не прочитано целиком. File read возвращает также file_evidence_id для привязки целого файла в плане. Файлы доступны только по manifest зарегистрированного снимка, а не по произвольному пути диска/CAS.
 
 По умолчанию запросы используют текущий индекс и проверяют live source/build. При расхождении — `STALE_WORKSPACE`; нужен новый `index build`. Историческое чтение выполняется явно: `--generation <id>`, а read/files также принимают `--snapshot <id>`, включая candidate задачи. Несовместимые snapshot/generation отклоняются. Для symbol/refs/calls/tests/text нужен соответствующий generation; candidate без построенного индекса читается через read/files/diff.
 
@@ -126,3 +126,12 @@ CLI автоматически получает текущие expected_revision
 ## Производительность и неизвестная свежесть
 
 Live checks используют read-only стабильное хеширование без CAS. При FRESHNESS_TIMEOUT статус задачи UNKNOWN; готовность не подтверждается. Для длинного scan доступен workspace check → run status. Agent metadata исключена по source-policy/v2, старые snapshots сохраняются. Подробнее — [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+
+### Быстрый статус и асинхронные мутации (0.4.2)
+
+`task status ID --stored` и `task diff ID --stored` читают сохранённое состояние без live scan, возвращая freshness=UNKNOWN. CLI автоматически использует такой запрос для получения expected_revision; актуальность по-прежнему проверяется внутри мутации.
+
+`task create --spec FILE --async`, `task revise ID --spec FILE --async`, `task plan ID --plan FILE --async`, `patch apply ID --patch FILE --async` сразу возвращают durable run_id. Проверяй `run status RUN_ID`; только SUCCEEDED означает завершение, результат задачи находится в data.result. Повтори запрос с тем же operation_id для получения того же receipt, если ответ потерян. При FAILED исправляй причину и используй новый operation_id. Запрос может выполниться уже после отключения клиента. Отмена best effort: проверяй итоговый task status --stored после отмены; она не откатывает уже закоммиченную мутацию. Одобрение поведения не предоставляется через async API.
+
+Статические ошибки spec/plan/evidence и отсутствие approval возвращаются до первого live scan. Неверный patch content hash и ошибки типизации пока могут обнаруживаться после первого scan; сохраняются обе live-проверки перед публикацией. Формирование патчей, большие файлы и пакетный экспорт требуют дальнейшей доработки.

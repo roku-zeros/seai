@@ -7,3 +7,5 @@
 /.gigacode/seai/session.json
 
 __pycache__/
+
+/.gigacode/seai/backups/

@@ -254,6 +254,12 @@
     },
     "business": {
       "$ref": "business-config-v1.schema.json"
+    },
+    "freshness_budget_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1800,
+      "description": "Live verification budget; 0/omitted uses 15 seconds. CLI --freshness-budget overrides."
     }
   },
   "required": [

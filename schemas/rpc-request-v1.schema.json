@@ -59,7 +59,8 @@
         "rules.diagnostics",
         "flow.get",
         "impact.get",
-        "workspace.check"
+        "workspace.check",
+        "workflow.submit"
       ]
     },
     "params": {
@@ -177,6 +178,24 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 8
+        },
+        "encoding": {
+          "enum": [
+            "text",
+            "base64",
+            "both"
+          ]
+        },
+        "stored": {
+          "type": "boolean"
+        },
+        "workflow_method": {
+          "enum": [
+            "task.create",
+            "task.revise",
+            "task.plan",
+            "patch.apply"
+          ]
         }
       },
       "required": [

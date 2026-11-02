@@ -90,6 +90,15 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 		if e != nil {
 			return nil, e
 		}
+		if p.Stored {
+			t.CheckSummary = s.checkSummary(ctx, t)
+			t.Freshness = "UNKNOWN"
+			t.FreshnessError = &domain.Error{Code: "FRESHNESS_NOT_CHECKED", Message: "Stored task metadata only; no live verification performed"}
+			if method == "task.diff" {
+				return s.diff(ctx, t)
+			}
+			return t, nil
+		}
 		pin, e := s.resolve(ctx, "")
 		if e != nil {
 			return nil, e
@@ -151,11 +160,7 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 	if *p.Epoch != pin.Epoch {
 		return nil, domain.Err("REVISION_CONFLICT", "expected project epoch %d, actual %d", *p.Epoch, pin.Epoch)
 	}
-	if method != "task.cancel" {
-		if e = s.guard(ctx, pin); e != nil {
-			return nil, e
-		}
-	}
+
 	var t domain.Task
 	if method != "task.create" {
 		t, e = s.getTask(ctx, s.Store.DB, p.Task)
@@ -170,6 +175,41 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 		}
 		if t.State == "CANCELLED" && method != "task.resume" {
 			return nil, domain.Err("INVALID_STATE", "resume the cancelled task first")
+		}
+	}
+	if method == "task.create" || method == "task.revise" {
+		if p.Spec == nil {
+			return nil, domain.Err("SCHEMA_INVALID", "spec required")
+		}
+		if e = changespec.Validate(*p.Spec); e != nil {
+			return nil, e
+		}
+	}
+	if method == "task.plan" {
+		if p.Plan == nil {
+			return nil, domain.Err("SCHEMA_INVALID", "plan required")
+		}
+		if e = changespec.ValidatePlan(*p.Plan, t.Spec); e != nil {
+			return nil, e
+		}
+		if e = s.validateEvidence(ctx, pin.Path, *p.Plan); e != nil {
+			return nil, e
+		}
+	}
+	if method == "patch.apply" {
+		if t.Kind == "explain" || t.Plan == nil {
+			return nil, domain.Err("PLAN_REQUIRED", "accepted change/refactor plan required")
+		}
+		if t.Kind == "change" && !t.Approved {
+			return nil, domain.Err("APPROVAL_REQUIRED", "human must approve the current behavior digest")
+		}
+		if p.Patch == nil {
+			return nil, domain.Err("SCHEMA_INVALID", "patch required")
+		}
+	}
+	if method != "task.cancel" {
+		if e = s.guard(ctx, pin); e != nil {
+			return nil, e
 		}
 	}
 	var patchID, patchBase, patchManifest string
@@ -491,7 +531,7 @@ func (s *Service) validateEvidence(ctx context.Context, path string, plan domain
 				_ = db.QueryRowContext(ctx, "SELECT count(*) FROM business_evidence WHERE evidence=?", id).Scan(&n)
 			}
 			if n == 0 {
-				return domain.Err("EVIDENCE_NOT_FOUND", "plan evidence absent from baseline generation")
+				return domain.Err("EVIDENCE_NOT_FOUND", "evidence_id %s in step %s is absent from baseline generation; use file_evidence_id from file.read, or an indexed search/symbol evidence_id", id, step.ID)
 			}
 		}
 	}

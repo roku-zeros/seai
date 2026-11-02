@@ -18,6 +18,7 @@ import (
 
 type extendedOptions struct {
 	mutation, human bool
+	async           bool
 	output, format  string
 }
 
@@ -126,6 +127,9 @@ func parseExtended(args []string) (string, application.Params, extendedOptions, 
 		return bad()
 	}
 	f := flag.NewFlagSet(method, flag.ContinueOnError)
+	async := f.Bool("async", false, "return durable run_id immediately; poll run status")
+	encoding := f.String("encoding", "", "text (default), base64 or both")
+	stored := f.Bool("stored", false, "stored task metadata, freshness UNKNOWN; no live scan")
 	generation := f.String("generation", "", "explicit immutable generation (otherwise live/current)")
 	snapshot := f.String("snapshot", "", "explicit source/candidate snapshot")
 	limit := f.Int("limit", 0, "page size")
@@ -160,11 +164,18 @@ func parseExtended(args []string) (string, application.Params, extendedOptions, 
 	case "files.list":
 		addFlags("generation", "snapshot", "prefix", "offset", "limit")
 	case "file.read":
-		addFlags("generation", "snapshot", "offset", "limit")
-	case "symbol.get", "references.find", "calls.list", "tests.related":
+		addFlags("generation", "snapshot", "offset", "limit", "encoding")
+	case "task.get", "task.diff":
+		addFlags("stored")
+	case "symbol.get":
+		addFlags("generation", "offset", "limit", "encoding")
+	case "references.find", "calls.list", "tests.related":
 		addFlags("generation", "offset", "limit")
 	case "search.entities":
 		addFlags("generation", "limit", "text", "cursor")
+	}
+	if o.mutation && !o.human && (method == "task.create" || method == "task.revise" || method == "task.plan" || method == "patch.apply") {
+		addFlags("async")
 	}
 	if o.mutation {
 		addFlags("operation-id", "revision", "epoch")
@@ -197,6 +208,9 @@ func parseExtended(args []string) (string, application.Params, extendedOptions, 
 		return "", p, o, fmt.Errorf("--cursor requires --text")
 	}
 
+	o.async = *async
+	p.Encoding = *encoding
+	p.Stored = *stored
 	p.Generation = *generation
 	p.Snapshot = *snapshot
 	p.Limit = *limit

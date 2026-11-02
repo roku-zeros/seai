@@ -42,6 +42,13 @@
     "next_offset": {
       "type": "integer",
       "minimum": 0
+    },
+    "encoding": {
+      "enum": [
+        "text",
+        "base64",
+        "both"
+      ]
     }
   },
   "required": [
@@ -51,9 +58,19 @@
     "blob_digest",
     "start_byte",
     "end_byte",
-    "content_base64",
-    "text",
     "truncated",
     "next_offset"
+  ],
+  "anyOf": [
+    {
+      "required": [
+        "text"
+      ]
+    },
+    {
+      "required": [
+        "content_base64"
+      ]
+    }
   ]
 }

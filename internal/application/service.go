@@ -34,6 +34,9 @@ type Service struct {
 	FreshnessBudget time.Duration
 }
 type Params struct {
+	WorkflowMethod  string             `json:"workflow_method,omitempty"`
+	Encoding        string             `json:"encoding,omitempty"`
+	Stored          bool               `json:"stored,omitempty"`
 	Context         map[string]string  `json:"context,omitempty"`
 	Depth           int                `json:"depth,omitempty"`
 	Schema          string             `json:"schema_version"`
@@ -79,8 +82,10 @@ func (s *Service) Handle(ctx context.Context, method string, p Params) (any, err
 		return nil, domain.Err("SCHEMA_INVALID", "schema_version must be %s", domain.API)
 	}
 	switch method {
+	case "workflow.submit":
+		return s.submitWorkflow(ctx, p)
 	case "handshake":
-		return map[string]string{"schema_version": domain.API, "server_version": "0.4.1-dev"}, nil
+		return map[string]string{"schema_version": domain.API, "server_version": "0.4.2-dev"}, nil
 	case "capabilities.get":
 		capabilities := map[string]any{"source_policy": workspace.SourcePolicy, "excluded_metadata": workspace.MetadataExclusions(), "async_workspace_check": true, "business_rules": true, "business_flow": true, "business_impact": true, "business_configured": s.Config.Business != nil && len(s.Config.Business.Adapters) > 0, "business_checks": true, "runner_profiles": checks.ProfileSummaries(s.Profiles), "release_reconciliation": true, "backup_restore": true, "worker_runtime": true, "structural_search": true, "snapshot_reads": true, "text_search": true, "typed_references": true, "static_calls": true, "task_contracts": true, "candidate_patches": true, "product_checks": len(s.Profiles) > 0, "interactive_human_approval": true, "snapshot_modes": []string{"working_tree", "explicit_ref"}, "provider_ready": s.Provider != nil && s.Provider.Verified(), "multi_agent_ready": false, "pilot_ready": false, "blocking_issues": []string{"P0 Qwen and GigaCode profiles are unverified", "domain patterns and verification isolation are unconfigured", "runner isolation, actual Qwen/GigaCode and pilot domain coverage require P0 verification"}, "limitations": indexer.Limitations}
 		blockers := []string{"P0 actual Qwen/GigaCode and product acceptance remain unverified"}
@@ -101,6 +106,11 @@ func (s *Service) Handle(ctx context.Context, method string, p Params) (any, err
 		if docker {
 			blockers = append(blockers, "Docker isolation requires verification on the operator host")
 		}
+		budget := s.FreshnessBudget
+		if budget <= 0 {
+			budget = DefaultFreshnessBudget
+		}
+		capabilities["freshness_budget_seconds"] = budget.Seconds()
 		capabilities["blocking_issues"] = blockers
 		return capabilities, nil
 	case "project.get":

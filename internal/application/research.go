@@ -3,16 +3,15 @@ package application
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"seai.local/seai/internal/business"
 	"seai.local/seai/internal/domain"
 	"seai.local/seai/internal/indexer"
+	"seai.local/seai/internal/sourcepage"
 	"seai.local/seai/internal/workspace"
 )
 
@@ -55,7 +54,7 @@ func (s *Service) live(ctx context.Context) (domain.Manifest, string, error) {
 	defer cancel()
 	m, id, e := s.observe(check)
 	if e != nil && check.Err() != nil && ctx.Err() == nil {
-		return domain.Manifest{}, "", &domain.Error{Code: "FRESHNESS_TIMEOUT", Message: fmt.Sprintf("live verification exceeded %s; freshness is unknown, daemon may still be healthy", budget), Retryable: true, SuggestedAction: "Run workspace check (async), or read immutable --generation/--snapshot. Do not retry live scans in a loop or kill seaid."}
+		return domain.Manifest{}, "", &domain.Error{Code: "FRESHNESS_TIMEOUT", Message: fmt.Sprintf("live verification exceeded %s; freshness is unknown, daemon may still be healthy", budget), Retryable: false, SuggestedAction: "Configure freshness_budget_seconds or --freshness-budget for this host. Run workspace check (async), or read immutable --generation/--snapshot. Do not retry live scans in a loop or kill seaid."}
 	}
 	return m, id, e
 }
@@ -244,23 +243,17 @@ func (s *Service) research(ctx context.Context, method string, p Params) (any, e
 				if e != nil {
 					return nil, e
 				}
-				if p.Offset > len(b) {
-					return nil, domain.Err("INVALID_RANGE", "offset exceeds file length")
+				page, err := sourcepage.Read(b, p.Offset, p.Limit, p.Encoding)
+				if err != nil {
+					return nil, err
 				}
-				limit := p.Limit
-				if limit == 0 {
-					limit = 8192
-				}
-				if limit > 65536 {
-					return nil, domain.Err("SCHEMA_INVALID", "read limit <=65536 bytes")
-				}
-				end := min(p.Offset+limit, len(b))
-				part := b[p.Offset:end]
-				text := ""
-				if utf8.Valid(part) {
-					text = string(part)
-				}
-				return envelope(map[string]any{"file_path": f.Path, "blob_digest": f.Digest, "mode": f.Mode, "size_bytes": len(b), "start_byte": p.Offset, "end_byte": end, "text": text, "content_base64": base64.StdEncoding.EncodeToString(part), "truncated": end < len(b), "next_offset": end, "file_evidence_id": domain.Digest([]byte(f.Digest + ":" + f.Path)), "evidence_id": domain.Digest([]byte(fmt.Sprintf("%s:%s:%d:%d", f.Digest, f.Path, p.Offset, end)))}), nil
+				page["file_path"] = f.Path
+				page["blob_digest"] = f.Digest
+				page["mode"] = f.Mode
+				page["size_bytes"] = len(b)
+				page["file_evidence_id"] = domain.Digest([]byte(f.Digest + ":" + f.Path))
+				page["evidence_id"] = domain.Digest([]byte(fmt.Sprintf("%s:%s:%d:%d", f.Digest, f.Path, p.Offset, page["end_byte"])))
+				return envelope(page), nil
 			}
 		}
 		return nil, domain.Err("NOT_FOUND", "file absent from selected snapshot")
@@ -280,12 +273,12 @@ func (s *Service) research(ctx context.Context, method string, p Params) (any, e
 	case "symbol.get":
 		limit := p.Limit
 		if limit == 0 {
-			limit = 8192
+			limit = 65536
 		}
 		if limit > 65536 {
 			return nil, domain.Err("SCHEMA_INVALID", "symbol page <=65536 bytes")
 		}
-		result, e := indexer.Symbol(ctx, pin.Path, p.Symbol, p.Offset, limit, s.Workspace.Objects)
+		result, e := indexer.Symbol(ctx, pin.Path, p.Symbol, p.Offset, limit, s.Workspace.Objects, p.Encoding)
 		if e != nil {
 			return nil, e
 		}

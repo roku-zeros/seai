@@ -60,6 +60,13 @@
     "evidence_id": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "encoding": {
+      "enum": [
+        "text",
+        "base64",
+        "both"
+      ]
     }
   },
   "required": [
@@ -71,11 +78,21 @@
     "size_bytes",
     "start_byte",
     "end_byte",
-    "text",
-    "content_base64",
     "truncated",
     "next_offset",
     "file_evidence_id",
     "evidence_id"
+  ],
+  "anyOf": [
+    {
+      "required": [
+        "text"
+      ]
+    },
+    {
+      "required": [
+        "content_base64"
+      ]
+    }
   ]
 }

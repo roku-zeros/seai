@@ -111,7 +111,7 @@ with tempfile.TemporaryDirectory(prefix='seai-business-') as tmp:
             proc=start()
             assert cli('rules','search','AGE_MIN')['rules']
             assert cli('run','status',result['run_id'])['state']=='SUCCEEDED'
-            print(json.dumps(dict(status='passed',version='0.4.1-dev',checks=['typed Go registrations','duplicate IDs by context','source evidence','shared impact across products','forward constants/conditions','candidate domain gate','9 executed business fixtures','normal/boundary/exception/combination coverage','rule trace','candidate generation pinning','restart','source preserved']),indent=2))
+            print(json.dumps(dict(status='passed',version=json.loads(run([binaries / 'seaid', '--version']))['product_version'],checks=['typed Go registrations','duplicate IDs by context','source evidence','shared impact across products','forward constants/conditions','candidate domain gate','9 executed business fixtures','normal/boundary/exception/combination coverage','rule trace','candidate generation pinning','restart','source preserved']),indent=2))
         finally:
             if proc is not None and proc.poll() is None:proc.terminate();proc.wait(timeout=20)
             shutil.rmtree(data)

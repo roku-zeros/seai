@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"seai.local/seai/internal/application"
+	"seai.local/seai/internal/mcpbridge"
 	"seai.local/seai/internal/transports"
 	"time"
 )
@@ -41,6 +42,24 @@ func run() int {
 		return offline(ctx, *data, args)
 	}
 	socket := filepath.Join(*data, "seaid.sock")
+	if args[0] == "mcp" {
+		sub := flag.NewFlagSet("mcp", flag.ContinueOnError)
+		repo := sub.String("repo", "", "explicit project root (required)")
+		writes := sub.Bool("candidate-writes", false, "expose limited private candidate workflow tools; no human approvals")
+		if sub.Parse(args[1:]) != nil || *repo == "" || len(sub.Args()) != 0 {
+			fmt.Fprintln(os.Stderr, "usage: seai --data DATA mcp --repo ROOT [--candidate-writes]")
+			return 2
+		}
+		server := mcpbridge.Server{Repo: *repo, CandidateWrites: *writes, Call: func(c context.Context, m string, p application.Params) (transports.Envelope, error) {
+			return transports.Call(c, socket, m, p)
+		}}
+		if err := server.Serve(ctx, os.Stdin, os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 4
+		}
+		return 0
+	}
+
 	hand, e := transports.Call(ctx, socket, "handshake", application.Params{})
 	if e != nil {
 		fmt.Fprintln(os.Stderr, e)
@@ -148,7 +167,7 @@ func run() int {
 			if p.Revision == nil {
 				rev := 0
 				if method != "task.create" && p.Task != "" {
-					state, err := transports.Call(ctx, socket, "task.get", application.Params{Task: p.Task})
+					state, err := transports.Call(ctx, socket, "task.get", application.Params{Task: p.Task, Stored: true})
 					if err != nil {
 						fmt.Fprintln(os.Stderr, err)
 						return 4
@@ -170,6 +189,10 @@ func run() int {
 		}
 		if options.human {
 			return approve(ctx, socket, p, method)
+		}
+		if options.async {
+			p.WorkflowMethod = method
+			method = "workflow.submit"
 		}
 		env, err := transports.Call(ctx, socket, method, p)
 		if err != nil {

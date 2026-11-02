@@ -1,4 +1,18 @@
-# Проверки 0.4.1-dev — большой repo, symlinks и timeouts
+# Проверки 0.4.2-dev — MCP, стоимость чтения и async workflow
+
+2 ноября 2026, macOS arm64, Go 1.26.6. Полный `go test -race -p 1 -timeout 180s ./...`: PASS (54 test functions, 20 packages, 15 с tests). `go vet ./...`: PASS. После финального изменения stored diff и MCP input schema дополнительно прошёл целевой race-набор. Python tests: 17 PASS. Все пять обновлённых skills прошли quick_validate.
+
+MCP smoke на собранных бинарниках: PASS, stdio → Unix RPC → daemon → индекс/задача. Discovery без daemon около 0,2s на этом стенде; input schemas валидируются Draft202012. Проверены bundled contracts, project root attestation, pinned read после изменения исходника без live scan, один text без base64 duplication, запрет human approval, async create/idempotent replay, run timing, stored task/diff и неизменность product checkout. Это не измерение пользовательского проекта и не проверка фактического GigaCode.
+
+Новые регрессии: invalid spec/evidence отклоняются даже при заведомо недостаточном freshness budget (до scan); stored task имеет UNKNOWN и не даёт readiness; async failure не создаёт задачу; runtime budget bounds/reset; UTF-8 boundaries, binary fallback и чтение файла 19333 bytes одной страницей; read-only MCP не допускает hidden mutation params или candidate calls, не принимает другой root.
+
+Полные CLI и business smoke с JSON Schema validation: PASS после повторного прогона, включая 18 CLI проверок (backup/restore/staged upgrade) и 9 исполненных business fixtures. При промежуточном прогоне найдены hardcoded version в upgrade fixture (исправлено чтением manifest бинарника) и нехватка локального диска; кэши этой задачи очищены, промежуточные failures не считаются PASS.
+
+Не проверены: пользовательский двухчасовой сценарий, конкретный GigaCode/trust UX, реальный Qwen endpoint и продуктовые business/check profiles. Полный отказ от shell подтверждений относится только к инструментам подключённого доверенного MCP; оставшиеся CLI/операторские действия зависят от клиентской политики. Skills не обеспечивают технический sandbox остальных tools.
+
+---
+
+# Исторические проверки 0.4.1-dev — большой repo, symlinks и timeouts
 
 2 ноября 2026, macOS arm64, Go 1.26.6. Root race suite: PASS, 48 test functions, все 17 пакетов собираются, 13 имеют tests. `go vet ./...`: PASS. Оба CLI/Unix smoke с JSON Schema validation: PASS, включая прежние checks/backup/restore/upgrade и 9 бизнес-сценариев. Python tests: 15 PASS (11 installer + 4 async-wait). Два изменённых skills прошли quick_validate.
 

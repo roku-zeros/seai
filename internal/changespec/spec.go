@@ -15,7 +15,7 @@ func Validate(s domain.ChangeSpec) error {
 		return domain.Err("SCHEMA_INVALID", "ChangeSpec version, change_id, revision and objective are required")
 	}
 	if s.Requirements == nil || s.Scope.Files == nil || s.Expected == nil || s.Preserved == nil || s.Criteria == nil || s.Unresolved == nil || len(s.Requirements) > 32 || len(s.Expected) > 200 || len(s.Preserved) > 200 || len(s.Criteria) > 200 || len(s.Unresolved) > 200 {
-		return domain.Err("SCHEMA_INVALID", "all contract collections must be explicit arrays; collection limits exceeded")
+		return domain.Err("SCHEMA_INVALID", "source_requirements, scope.files, expected_behavior, preserved_behavior, acceptance_criteria and unresolved must be explicit arrays (use [] for empty); limits: requirements 32, other collections 200")
 	}
 	if s.Kind != "change" && s.Kind != "refactor" && s.Kind != "explain" {
 		return domain.Err("SCHEMA_INVALID", "unsupported task kind")
@@ -79,7 +79,7 @@ func Validate(s domain.ChangeSpec) error {
 	}
 	if s.Kind != "explain" {
 		if len(paths) == 0 || len(s.Unresolved) > 0 || len(s.Preserved) == 0 || len(s.Criteria) == 0 {
-			return domain.Err("SPEC_NOT_READY", "explicit file scope, preserved behavior, criteria and no unresolved items required")
+			return domain.Err("SPEC_NOT_READY", "scope.files=%d (need >=1), preserved_behavior=%d (need >=1), acceptance_criteria=%d (need >=1), unresolved=%d (need 0)", len(paths), len(s.Preserved), len(s.Criteria), len(s.Unresolved))
 		}
 		if s.Kind == "change" && (len(s.Expected) == 0 || len(s.Requirements) == 0) {
 			return domain.Err("SPEC_NOT_READY", "change requires expected behavior and revisioned requirements")

@@ -5,6 +5,8 @@ description: Проверять исходники и task diff через SEAI 
 
 # Ревью через SEAI
 
+Если доступны `seai_connect` и `seai_read`, используй MCP вместо shell-команд. Подключение фиксирует generation для чтений; `task.get` через MCP возвращает сохранённые данные с freshness=UNKNOWN. Если доступен `seai_candidate`, отправляй create/revise/plan/patch асинхронно и опрашивай `runs.get` по run_id. Не повторяй отправку при таймауте: используй тот же operation_id или проверяй run. MCP не предоставляет human approval и не заменяет настройки check profiles. Ниже — эквивалентный CLI fallback для установок без MCP.
+
 Соблюдай `.gigacode/seai/POLICY.md`. Для задачи запроси `task status ID`, затем `task diff ID` и `read PATH --snapshot BASELINE_OR_CANDIDATE`. Для отдельных функций используй seai-research. Все замечания связывай с конкретными источниками/ranges; live файлы, git diff и IDE buffers напрямую не читай.
 
 Сопоставь scope, expected/preserved behavior и AC с diff; различай найденные дефекты, гипотезы и неохваченные зависимости. Graph относится к указанному generation baseline; новый candidate ещё не прошёл повторную типизацию или тесты. Diff/state могут быть историческими и stale — покажи это явно.

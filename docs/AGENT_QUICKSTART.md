@@ -1,10 +1,12 @@
 # Установка и использование SEAI агентом GigaCode
 
+Для GigaCode CLI используйте [прямое MCP-подключение](GIGACODE_MCP.md): оно убирает shell из чтений/поиска и поддерживает отдельное доверие candidate tools. При обновлении инструкций используйте установщик с `--upgrade` (с backups).
+
 Этот runbook предназначен для GigaCode или другого агента с файловыми и терминальными инструментами. Выполняй его, когда пользователь попросил установить или проверить SEAI. Для первого запуска используй демонстрационный репозиторий; реальный проект подключай по указанному пользователем пути.
 
 При установленном наборе SEAI-only skills постоянная политика `.gigacode/seai/POLICY.md` ограничивает доступ к коду. Установка/сборка самого SEAI — отдельный административный этап до подключения целевого проекта. Настройка skills описана в [GIGACODE_SKILLS.md](GIGACODE_SKILLS.md). Если GigaCode запущен в общей родительской папке проекта и SEAI, установи правило/skills туда через --workspace; наличие GIGACODE.md только внутри дочерней папки не подтверждает его загрузку текущей сессией. `/seai:setup` теперь подключается к установленному инструменту; для первоначальной установки используй прямое прикрепление этого runbook.
 
-Текущая поставка — `0.4.1-dev`, Go 1.26.6. SEAI обеспечивает snapshot/read/search/refs/calls, контракт задачи и изолированный candidate/patch/diff; объяснения и подготовку предложений выполняет GigaCode. Нет встроенного чата и MCP-сервера. Qwen workers, product check runner и release rebase настраиваются по [EXECUTION.md](EXECUTION.md); Qwen по решению пользователя пока не настроен. Средние/большие задачи допускаются как исследование с явными ограничениями, не как автономный change workflow.
+Текущая поставка — `0.4.2-dev`, Go 1.26.6. SEAI обеспечивает snapshot/read/search/refs/calls, контракт задачи и изолированный candidate/patch/diff; объяснения и подготовку предложений выполняет GigaCode. Встроенного чата нет; stdio MCP подключается по GIGACODE_MCP.md. Qwen workers, product check runner и release rebase настраиваются по [EXECUTION.md](EXECUTION.md); Qwen по решению пользователя пока не настроен. Средние/большие задачи допускаются как исследование с явными ограничениями, не как автономный change workflow.
 
 ## 1. Проверить окружение и найти проект
 
@@ -204,7 +206,7 @@ Demo не удаляй, пока пользователь продолжает �
 @docs/AGENT_QUICKSTART.md Выполни установку и демонстрацию по шагам 1–4, затем покажи отчёт. Правило пока не меняй.
 ```
 
-В репозитории также есть prompt shortcuts `.gigacode/commands/seai/setup.md` и `ask.md`: `/seai:setup` и `/seai:ask`. Это Markdown-промпты для подключения/research в режиме SEAI-only, не native SEAI tools. Skills перечислены в GIGACODE_SKILLS.md. Их формат взят из [официальной документации GigaCode CLI](https://gitverse.ru/docs/ai/ai-assistant-gigacode/gigacode-cli/commands); конкретная установленная версия клиента ещё не проверена. Если shortcuts не обнаруживаются, используй прямое прикрепление файла выше. MCP здесь не настраивается.
+В репозитории также есть prompt shortcuts `.gigacode/commands/seai/setup.md` и `ask.md`: `/seai:setup` и `/seai:ask`. Это Markdown-промпты для подключения/research в режиме SEAI-only, не native SEAI tools. Skills перечислены в GIGACODE_SKILLS.md. Их формат взят из [официальной документации GigaCode CLI](https://gitverse.ru/docs/ai/ai-assistant-gigacode/gigacode-cli/commands); конкретная установленная версия клиента ещё не проверена. Если shortcuts не обнаруживаются, используй прямое прикрепление файла выше. Эти shortcuts не настраивают MCP; отдельная установка описана в GIGACODE_MCP.md.
 
 ## Большие репозитории
 

@@ -8,12 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"seai.local/seai/internal/application"
 	"seai.local/seai/internal/contracts"
 	"seai.local/seai/internal/domain"
+	"sync/atomic"
 	"time"
 )
 
@@ -57,6 +59,11 @@ func Handler(s *application.Service) http.Handler {
 			_ = json.NewEncoder(w).Encode(Response{JSONRPC: "2.0", ID: req.ID, Error: &RPCError{Code: -32600, Message: "invalid request"}})
 			return
 		}
+		started := time.Now()
+		code := "OK"
+		defer func() {
+			log.Printf("rpc_complete request_id=%q method=%q operation_id=%q task_id=%q run_id=%q duration_ms=%d code=%q", req.ID, req.Method, req.Params.Operation, req.Params.Task, req.Params.ID, time.Since(started).Milliseconds(), code)
+		}()
 		var data any
 		if r.URL.Path == "/human/approve" {
 			if req.Method != "human.approve" && req.Method != "human.review" && req.Method != "human.requirements" {
@@ -73,6 +80,7 @@ func Handler(s *application.Service) http.Handler {
 			if !errors.As(e, &de) {
 				de = &domain.Error{Code: "RUNTIME_ERROR", Message: e.Error()}
 			}
+			code = de.Code
 			env.Status = "error"
 			env.Error = de
 			env.Data = nil
@@ -105,9 +113,12 @@ type timeoutKey struct{}
 func WithTimeout(ctx context.Context, d time.Duration) context.Context {
 	return context.WithValue(ctx, timeoutKey{}, d)
 }
+
+var requestSequence atomic.Uint64
+
 func callRoute(ctx context.Context, socket, route, method string, p application.Params) (Envelope, error) {
 	p.Schema = domain.API
-	b, e := json.Marshal(Request{JSONRPC: "2.0", ID: "cli", Method: method, Params: p})
+	b, e := json.Marshal(Request{JSONRPC: "2.0", ID: fmt.Sprintf("cli-%d-%d", time.Now().UnixNano(), requestSequence.Add(1)), Method: method, Params: p})
 	if e != nil {
 		return Envelope{}, e
 	}

@@ -5,6 +5,8 @@ description: Подключить GigaCode к уже установленном�
 
 # Подключение SEAI
 
+Если доступны `seai_connect` и `seai_read`, используй MCP вместо shell-команд. Подключение фиксирует generation для чтений; `task.get` через MCP возвращает сохранённые данные с freshness=UNKNOWN. Если доступен `seai_candidate`, отправляй create/revise/plan/patch асинхронно и опрашивай `runs.get` по run_id. Не повторяй отправку при таймауте: используй тот же operation_id или проверяй run. MCP не предоставляет human approval и не заменяет настройки check profiles. Ниже — эквивалентный CLI fallback для установок без MCP.
+
 Соблюдай `.gigacode/seai/POLICY.md` относительно project root. Управляющие файлы skill/policy/session можно читать напрямую; исходники — только через SEAI.
 
 1. Получи absolute `seai_bin`, `data_dir`, `project_root` из `.gigacode/seai/session.json` либо явных данных пользователя. Если их нет, запроси недостающие координаты. Не сканируй файловую систему для угадывания проекта/runtime.
