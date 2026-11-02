@@ -60,7 +60,12 @@
         "flow.get",
         "impact.get",
         "workspace.check",
-        "workflow.submit"
+        "workflow.submit",
+        "research.start",
+        "research.get",
+        "research.claim",
+        "research.report",
+        "research.cancel"
       ]
     },
     "params": {
@@ -196,6 +201,24 @@
             "task.plan",
             "patch.apply"
           ]
+        },
+        "research": {
+          "$ref": "research-request-v1.schema.json"
+        },
+        "research_job_id": {
+          "type": "string"
+        },
+        "report": {
+          "$ref": "research-report-v1.schema.json"
+        },
+        "lease_epoch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "wait_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
         }
       },
       "required": [

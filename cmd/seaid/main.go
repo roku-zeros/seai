@@ -133,7 +133,7 @@ func run() error {
 		defer cancel()
 		_ = server.Shutdown(shutdown)
 	}()
-	log.Printf("seaid 0.4.2-dev project=%s socket=%s", *project, sock)
+	log.Printf("seaid 0.4.3-dev project=%s socket=%s", *project, sock)
 	e = server.Serve(listener)
 	s.CancelRuns()
 	s.Wait()

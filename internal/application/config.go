@@ -28,6 +28,9 @@ func (s *Service) Configure(path string) error {
 	if c.Schema != "seai.runtime/v1" || c.MaxWorkers < 1 || c.MaxWorkers > 2 || c.MaxNodeAttempts < 1 || c.MaxNodeAttempts > 2 || c.MaxRunSeconds < 1 || c.MaxRunSeconds > 7200 {
 		return domain.Err("SCHEMA_INVALID", "runtime configuration bounds invalid")
 	}
+	if c.ResearchMaxWorkers < 0 || c.ResearchMaxWorkers > 4 {
+		return domain.Err("SCHEMA_INVALID", "research_max_workers must be 0 (default 2) or 1..4")
+	}
 	if c.FreshnessBudgetSeconds < 0 || c.FreshnessBudgetSeconds > 1800 {
 		return domain.Err("SCHEMA_INVALID", "freshness_budget_seconds must be 0 (default) or 1..1800")
 	}

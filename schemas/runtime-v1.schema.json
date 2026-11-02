@@ -260,6 +260,12 @@
       "minimum": 0,
       "maximum": 1800,
       "description": "Live verification budget; 0/omitted uses 15 seconds. CLI --freshness-budget overrides."
+    },
+    "research_max_workers": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4,
+      "description": "External research jobs running concurrently; 0/omitted defaults to 2."
     }
   },
   "required": [

@@ -45,12 +45,13 @@ func run() int {
 	if args[0] == "mcp" {
 		sub := flag.NewFlagSet("mcp", flag.ContinueOnError)
 		repo := sub.String("repo", "", "explicit project root (required)")
+		research := sub.Bool("research", false, "expose research session coordination tools; no product writes")
 		writes := sub.Bool("candidate-writes", false, "expose limited private candidate workflow tools; no human approvals")
 		if sub.Parse(args[1:]) != nil || *repo == "" || len(sub.Args()) != 0 {
 			fmt.Fprintln(os.Stderr, "usage: seai --data DATA mcp --repo ROOT [--candidate-writes]")
 			return 2
 		}
-		server := mcpbridge.Server{Repo: *repo, CandidateWrites: *writes, Call: func(c context.Context, m string, p application.Params) (transports.Envelope, error) {
+		server := mcpbridge.Server{Repo: *repo, CandidateWrites: *writes, Research: *research, Call: func(c context.Context, m string, p application.Params) (transports.Envelope, error) {
 			return transports.Call(c, socket, m, p)
 		}}
 		if err := server.Serve(ctx, os.Stdin, os.Stdout); err != nil {

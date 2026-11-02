@@ -8,7 +8,7 @@ import tempfile
 
 
 def configure(workspace, project, binary, data, trust_readonly=False,
-              candidate_writes=False, trust_candidate_writes=False):
+              candidate_writes=False, trust_candidate_writes=False, research=False, trust_research=False):
     workspace = Path(workspace).resolve(strict=True)
     project = Path(project).resolve(strict=True)
     binary = Path(binary).resolve(strict=True)
@@ -21,6 +21,8 @@ def configure(workspace, project, binary, data, trust_readonly=False,
         raise ValueError("runtime must be outside project")
     if trust_candidate_writes and not candidate_writes:
         raise ValueError("--trust-candidate-writes requires --candidate-writes")
+    if trust_research and not research:
+        raise ValueError("--trust-research requires --research")
     folder = workspace / ".gigacode"
     path = folder / "settings.json"
     if folder.is_symlink() or path.is_symlink():
@@ -36,6 +38,9 @@ def configure(workspace, project, binary, data, trust_readonly=False,
     if candidate_writes:
         planned["seai-candidate"] = {**base, "args": base["args"] + ["--candidate-writes"],
                                      "trust": trust_candidate_writes, "includeTools": ["seai_candidate"]}
+    if research:
+        planned["seai_research"] = {**base, "args": base["args"] + ["--research"],
+                                    "trust": trust_research, "includeTools": ["seai_research_start", "seai_research_claim", "seai_research_report", "seai_research_cancel"]}
     for name, value in planned.items():
         if name in servers and servers[name] != value:
             raise ValueError(f"existing MCP entry {name!r} differs; merge settings manually (no files changed)")
@@ -53,7 +58,7 @@ def configure(workspace, project, binary, data, trust_readonly=False,
             if os.path.exists(temp):
                 os.unlink(temp)
     return {"settings": str(path), "servers": list(planned), "trust_readonly": trust_readonly,
-            "trust_candidate_writes": trust_candidate_writes,
+            "trust_candidate_writes": trust_candidate_writes, "research": research, "trust_research": trust_research,
             "next": "Restart GigaCode in workspace; /mcp must show connected; call seai_connect. This does not prove client integration or enforce SEAI-only source access."}
 
 
@@ -64,10 +69,12 @@ def main():
     p.add_argument("--trust-readonly", action="store_true", help="skip confirmations only for the bounded read-only SEAI server")
     p.add_argument("--candidate-writes", action="store_true", help="add separate candidate server; confirmations remain by default")
     p.add_argument("--trust-candidate-writes", action="store_true", help="explicitly trust candidate workflow calls too; human behavior approval is still required")
+    p.add_argument("--research", action="store_true", help="add read-only research coordination server; no Qwen endpoint required")
+    p.add_argument("--trust-research", action="store_true", help="trust research metadata operations only; no source/task changes")
     a = p.parse_args()
     try:
         print(json.dumps(configure(a.workspace, a.project, a.seai, a.data, a.trust_readonly,
-                                   a.candidate_writes, a.trust_candidate_writes), ensure_ascii=False, indent=2))
+                                   a.candidate_writes, a.trust_candidate_writes, a.research, a.trust_research), ensure_ascii=False, indent=2))
     except (ValueError, OSError) as e:
         p.exit(2, str(e) + "\n")
 

@@ -1,4 +1,12 @@
-# Статус реализации 0.4.2-dev
+# Статус реализации 0.4.3-dev
+
+Добавлен research board для внешних GigaCode workers: async start, 1–6 topics, default 2/max 4 concurrent claims, optimistic job leases, source generation pinning, idempotent claim/report, indexed evidence validation и durable per-job reports. Никакие LLM-вызовы, изменения source/task/candidate и approvals из этого API не выполняются. Gaps сохраняются как NEEDS_INPUT, cancel/restart fenced; один active runtime run сохраняется. Завершённые reports не дублируются в research.get. Cursor/long-poll до 10s возвращает компактное unchanged; stdio MCP обрабатывает до восьми calls одновременно, поэтому ожидание координатора не блокирует reads workers. Generation pin и вывод JSON-RPC защищены mutex.
+
+Добавлены opt-in research MCP server/tools, CLI research, skill координатора и три named agent profile с read-only allowlist. Fork использует родительский context/tools; технический sandbox всего клиента не заявляется. GigaCode должен реально запустить forks, SEAI сам их не создаёт. Qwen backend для этого режима не нужен. Проверки/ограничения — [PARALLEL_RESEARCH.md](PARALLEL_RESEARCH.md), [VALIDATION.md](VALIDATION.md).
+
+---
+
+# Исторический статус реализации 0.4.2-dev
 
 Добавлен ограниченный stdio MCP bridge: offline discovery, bundled schemas, project attestation, pinned read queries и optional async candidate workflow. По умолчанию только чтения; human decision, shell, export/release/check execution не экспонируются. Установщик настраивает project-scoped MCP trust отдельно для reads/candidate; глобальные shell permissions не меняются. Обновление skills/policy сохраняет backups и пользовательский текст вне managed block.
 

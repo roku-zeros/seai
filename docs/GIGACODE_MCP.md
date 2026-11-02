@@ -1,5 +1,7 @@
 # GigaCode CLI через SEAI MCP (0.4.2)
 
+Для параллельного исследования без отдельного Qwen endpoint см. [PARALLEL_RESEARCH.md](PARALLEL_RESEARCH.md): GigaCode forks и SEAI research board. Требуются дополнительный server --research и обновление skills/agent profiles.
+
 MCP даёт GigaCode прямые инструменты SEAI вместо вызовов shell. Skills и GIGACODE.md выбирают порядок работы; настройки MCP подключают инструменты и задают доверие. Это разные части установки. Техническое ограничение всех остальных инструментов GigaCode не реализуется одним skill: контролируйте фактические tool calls и правила клиента.
 
 ## Обновление и установка

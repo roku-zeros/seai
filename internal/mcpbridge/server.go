@@ -13,12 +13,16 @@ import (
 	"seai.local/seai/internal/contracts"
 	"seai.local/seai/internal/transports"
 	"seai.local/seai/schemas"
+	"strings"
+	"sync"
 )
 
 type Caller func(context.Context, string, application.Params) (transports.Envelope, error)
 type Server struct {
+	stateMu         sync.RWMutex
 	Repo            string
 	CandidateWrites bool
+	Research        bool
 	Call            Caller
 	generation      string
 	initialized     bool
@@ -31,8 +35,21 @@ type request struct {
 	Params  json.RawMessage `json:"params,omitempty"`
 }
 
-var readMethods = []string{"project.get", "capabilities.get", "files.list", "file.read", "search.entities", "search.text", "symbol.get", "references.find", "calls.list", "tests.related", "rules.search", "rules.get", "rules.discover", "rules.diagnostics", "flow.get", "impact.get", "task.get", "task.diff", "checks.profiles", "jobs.get", "runs.get", "runs.logs", "provider.status"}
+var readMethods = []string{"project.get", "capabilities.get", "files.list", "file.read", "search.entities", "search.text", "symbol.get", "references.find", "calls.list", "tests.related", "rules.search", "rules.get", "rules.discover", "rules.diagnostics", "flow.get", "impact.get", "task.get", "task.diff", "checks.profiles", "jobs.get", "runs.get", "runs.logs", "provider.status", "research.get", "agents.list"}
 var writeMethods = []string{"task.create", "task.revise", "task.plan", "patch.apply"}
+
+func (s *Server) pin() string {
+	s.stateMu.RLock()
+	defer s.stateMu.RUnlock()
+	return s.generation
+}
+func (s *Server) setPin(generation string, onlyEmpty bool) {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	if !onlyEmpty || s.generation == "" {
+		s.generation = generation
+	}
+}
 
 func member(method string, list []string) bool {
 	for _, m := range list {
@@ -51,13 +68,16 @@ func object(properties map[string]any, required ...string) map[string]any {
 func (s *Server) Tools() []any {
 	str := map[string]any{"type": "string"}
 	integer := map[string]any{"type": "integer", "minimum": 0}
-	props := map[string]any{"path": str, "query": str, "limit": integer, "offset": integer, "cursor": str, "index_generation_id": str, "source_snapshot_id": str, "symbol_id": str, "task_id": str, "job_id": str, "id": str, "profile_id": str, "depth": integer, "context": map[string]any{"type": "object", "additionalProperties": str}, "encoding": map[string]any{"enum": []string{"text", "base64", "both"}}}
+	props := map[string]any{"path": str, "query": str, "limit": integer, "offset": integer, "wait_ms": map[string]any{"type": "integer", "minimum": 0, "maximum": 10000}, "cursor": str, "index_generation_id": str, "source_snapshot_id": str, "symbol_id": str, "task_id": str, "job_id": str, "id": str, "profile_id": str, "depth": integer, "context": map[string]any{"type": "object", "additionalProperties": str}, "encoding": map[string]any{"enum": []string{"text", "base64", "both"}}}
 	reads := append([]string{}, readMethods...)
 	out := []any{
 		map[string]any{"name": "seai_connect", "description": "Start here: attest project root, inspect capabilities and pin the current immutable index. No live scan. Reconnect after index rebuild. No index means ask operator to build it once.", "inputSchema": object(map[string]any{}), "annotations": map[string]any{"readOnlyHint": true, "openWorldHint": false}},
 		map[string]any{"name": "seai_read", "description": "Read/search code exclusively through SEAI. Reads automatically use the generation pinned by seai_connect; no repeated live scans. task.get/diff return stored metadata with freshness UNKNOWN. Use file_evidence_id in plans. Search is literal, case sensitive; empty hits do not prove absence. Text defaults to 64 KiB without base64 duplication.", "inputSchema": object(map[string]any{"method": map[string]any{"enum": reads}, "params": object(props)}, "method"), "annotations": map[string]any{"readOnlyHint": true, "openWorldHint": false}},
 	}
-	out = append(out, map[string]any{"name": "seai_contract", "description": "Get exact JSON schema before constructing a change, plan, patch or runtime configuration. Local bundled contract; no daemon or source scan.", "inputSchema": object(map[string]any{"name": map[string]any{"enum": []string{"change", "plan", "patch", "runtime"}}}, "name"), "annotations": map[string]any{"readOnlyHint": true, "openWorldHint": false}})
+	out = append(out, map[string]any{"name": "seai_contract", "description": "Get exact JSON schema before constructing a change, plan, patch or runtime configuration. Local bundled contract; no daemon or source scan.", "inputSchema": object(map[string]any{"name": map[string]any{"enum": []string{"change", "plan", "patch", "runtime", "research-request", "research-report"}}}, "name"), "annotations": map[string]any{"readOnlyHint": true, "openWorldHint": false}})
+	if s.Research {
+		out = append(out, s.researchTools()...)
+	}
 	if s.CandidateWrites {
 		out = append(out, map[string]any{"name": "seai_candidate", "description": "Submit task.create/revise/plan or patch.apply asynchronously to a private candidate. Poll runs.get using returned run_id. Requires operation_id and expected_project_epoch; revision required. Human approval remains mandatory for behavior changes; no approval/export/release/shell tool is exposed.", "inputSchema": object(map[string]any{"method": map[string]any{"enum": writeMethods}, "params": map[string]any{"type": "object", "description": "SEAI RPC params: operation_id, expected_project_epoch, expected_revision, task_id and spec/plan/patch. See contracts."}}, "method", "params"), "annotations": map[string]any{"readOnlyHint": false, "destructiveHint": false, "idempotentHint": false, "openWorldHint": false}})
 	}
@@ -87,9 +107,7 @@ func (s *Server) attest(ctx context.Context) (transports.Envelope, error) {
 	if actual != expected {
 		return env, fmt.Errorf("PROJECT_MISMATCH: daemon root differs from --repo; select the matching runtime")
 	}
-	if s.generation == "" {
-		s.generation = project.Generation
-	}
+	s.setPin(project.Generation, true)
 	return env, nil
 }
 func (s *Server) invoke(ctx context.Context, raw json.RawMessage) (any, error) {
@@ -108,7 +126,7 @@ func (s *Server) invoke(ctx context.Context, raw json.RawMessage) (any, error) {
 		if e := contracts.StrictJSON(call.Arguments, &a); e != nil {
 			return nil, e
 		}
-		if !member(a.Name, []string{"change", "plan", "patch", "runtime"}) {
+		if !member(a.Name, []string{"change", "plan", "patch", "runtime", "research-request", "research-report"}) {
 			return nil, fmt.Errorf("unknown contract")
 		}
 		b, e := schemas.Contract(a.Name)
@@ -124,6 +142,12 @@ func (s *Server) invoke(ctx context.Context, raw json.RawMessage) (any, error) {
 	if env.Error != nil {
 		return env, nil
 	}
+	if strings.HasPrefix(call.Name, "seai_research_") {
+		if !s.Research {
+			return nil, fmt.Errorf("research coordination disabled on this MCP server")
+		}
+		return s.invokeResearch(ctx, call.Name, call.Arguments)
+	}
 	if call.Name == "seai_connect" {
 		if len(call.Arguments) > 0 {
 			var empty struct{}
@@ -136,12 +160,12 @@ func (s *Server) invoke(ctx context.Context, raw json.RawMessage) (any, error) {
 			Generation string `json:"current_generation_id"`
 		}
 		_ = json.Unmarshal(b, &project)
-		s.generation = project.Generation
+		s.setPin(project.Generation, false)
 		caps, e := s.Call(ctx, "capabilities.get", application.Params{})
 		if e != nil {
 			return nil, e
 		}
-		return map[string]any{"project": env, "capabilities": caps, "pinned_generation": s.generation, "freshness": "NOT_CHECKED", "next": "Use seai_read; reconnect after rebuilding. Missing product checks/business adapters require operator configuration."}, nil
+		return map[string]any{"project": env, "capabilities": caps, "pinned_generation": project.Generation, "freshness": "NOT_CHECKED", "next": "Use seai_read; reconnect after rebuilding. Missing product checks/business adapters require operator configuration."}, nil
 	}
 	var args struct {
 		Method string             `json:"method"`
@@ -170,6 +194,7 @@ func (s *Server) invoke(ctx context.Context, raw json.RawMessage) (any, error) {
 		clean.Job = ""
 		clean.ID = ""
 		clean.Profile = ""
+		clean.WaitMS = 0
 		clean.Depth = 0
 		clean.Context = nil
 		clean.Encoding = ""
@@ -181,7 +206,7 @@ func (s *Server) invoke(ctx context.Context, raw json.RawMessage) (any, error) {
 			p.Stored = true
 		}
 		if p.Generation == "" || p.Generation == "current" {
-			p.Generation = s.generation
+			p.Generation = s.pin()
 		}
 		if p.Snapshot != "" {
 			p.Generation = ""
@@ -214,10 +239,36 @@ func toolResult(value any, e error) any {
 }
 
 // Serve writes only newline-delimited JSON-RPC messages to stdout. Discovery never contacts the daemon.
-func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
+func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) (serveError error) {
+	ctx, cancel := context.WithCancel(ctx)
+	var workers sync.WaitGroup
+	var writeMu sync.Mutex
+	var writeError error
+	defer func() {
+		cancel()
+		workers.Wait()
+		if serveError == nil {
+			serveError = writeError
+		}
+	}()
+	slots := make(chan struct{}, 8)
+
 	scan := bufio.NewScanner(in)
 	scan.Buffer(make([]byte, 4096), 1<<20)
 	enc := json.NewEncoder(out)
+	write := func(response any) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		if writeError != nil {
+			return writeError
+		}
+		e := enc.Encode(response)
+		if e != nil {
+			writeError = e
+			cancel()
+		}
+		return e
+	}
 	for scan.Scan() {
 		var r request
 		e := contracts.StrictJSON(scan.Bytes(), &r)
@@ -244,7 +295,7 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
 					if version != "2024-11-05" && version != "2025-03-26" {
 						version = "2025-03-26"
 					}
-					response["result"] = map[string]any{"protocolVersion": version, "capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": map[string]any{"name": "seai", "version": "0.4.2-dev"}, "instructions": "Use seai_connect first, then seai_read for source access. No shell or human approval tools. Read-only server is safe to trust only when operator trusts this executable and selected repository."}
+					response["result"] = map[string]any{"protocolVersion": version, "capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": map[string]any{"name": "seai", "version": "0.4.3-dev"}, "instructions": "Use seai_connect first, then seai_read for source access. No shell or human approval tools. Read-only server is safe to trust only when operator trusts this executable and selected repository."}
 					s.initialized = true
 				}
 			}
@@ -257,13 +308,25 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
 			case "tools/list":
 				response["result"] = map[string]any{"tools": s.Tools()}
 			case "tools/call":
-				v, err := s.invoke(ctx, r.Params)
-				response["result"] = toolResult(v, err)
+				select {
+				case slots <- struct{}{}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				workers.Add(1)
+				go func(response map[string]any, params json.RawMessage) {
+					defer workers.Done()
+					defer func() { <-slots }()
+					v, err := s.invoke(ctx, params)
+					response["result"] = toolResult(v, err)
+					_ = write(response)
+				}(response, r.Params)
+				continue
 			default:
 				rpcError(-32601, "method not found")
 			}
 		}
-		if e = enc.Encode(response); e != nil {
+		if e = write(response); e != nil {
 			return e
 		}
 	}

@@ -36,3 +36,22 @@ class MCPConfigurationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 module.configure(project, project, binary, data, True, True, True)
             self.assertEqual(before, settings.read_bytes())
+
+    def test_research_server_is_separate_and_trust_is_explicit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = root / "repo"
+            project.mkdir()
+            data = root / "runtime"
+            data.mkdir()
+            binary = root / "seai"
+            binary.write_text("#!/bin/sh\nexit 0\n")
+            binary.chmod(0o700)
+            module.configure(project, project, binary, data, research=True, trust_research=True)
+            servers = json.loads((project / ".gigacode/settings.json").read_text())["mcpServers"]
+            self.assertFalse(servers["seai"]["trust"])
+            research = servers["seai_research"]
+            self.assertTrue(research["trust"])
+            self.assertEqual(research["args"][-1], "--research")
+            self.assertNotIn("seai_candidate", research["includeTools"])
+            self.assertEqual(len(research["includeTools"]), 4)

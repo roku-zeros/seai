@@ -1,4 +1,16 @@
-# Проверки 0.4.2-dev — MCP, стоимость чтения и async workflow
+# Проверки 0.4.3-dev — параллельный ресерч
+
+2 ноября 2026, macOS arm64, Go 1.26.6. Полный `go test -race -p 1 -timeout 180s ./...`: PASS; после финальных изменений research status/error, polling cursor, config bounds и конкурентной обработки MCP дополнительно прошёл целевой race-набор application/MCP/storage. В репозитории 62 test functions, 20 Go packages. `go vet ./...`: PASS. Python: 18 tests PASS. Все шесть skills прошли quick_validate; у трёх named agent profiles проверен явный read/claim/report allowlist и model=inherit.
+
+Регрессии подтверждают два одновременно claimed job у независимых клиентов, ограничение третьего, стабильное поколение исходников без live scan и без provider, сохранение трёх reports, idempotent start/claim/report, запрет выдуманного evidence, job lease fencing, NEEDS_INPUT для gaps, отмену queued/running jobs, bounds 1..4/default 2. Restart переводит queued/running research jobs в ABORTED и повышает lease, готовые reports не затираются. Research не создаёт change tasks и не меняет product source.
+
+Собранные 0.4.3-dev бинарники: полный CLI smoke (18 проверок, включая checks/backup/restore/staged upgrade) и business smoke (9 исполненных бизнес-сценариев) с JSON Schema validation — PASS. MCP smoke с двумя отдельными stdio-клиентами/синхронизационным барьером и тремя evidence reports без provider — PASS; input schemas всех новых tools валидируются. Финальный MCP прогон дополнительно проверяет CLI research start/status/claim/cancel и компактное unchanged polling. Тест реального stdio Serve через io.Pipe подтверждает, что заблокированный poll не задерживает другой read; JSON-RPC ответы сопоставляются по ID и не перемешиваются.
+
+Не проверены: фактический GigaCode, его фоновые forks и скорость на пользовательской задаче. Smoke доказывает конкурентный доступ клиентов к SEAI, а не запуск LLM-процессов клиентом или 2×/4× ускорение. SEAI сам не создаёт внешних агентов. Настройка отдельного Qwen endpoint для external-worker research не нужна; его существующий полный worker DAG остаётся отдельным режимом. One-active-run barrier, lack of automatic reassignment/resume и клиентские rate limits описаны в PARALLEL_RESEARCH.md.
+
+---
+
+# Исторические проверки 0.4.2-dev — MCP, стоимость чтения и async workflow
 
 2 ноября 2026, macOS arm64, Go 1.26.6. Полный `go test -race -p 1 -timeout 180s ./...`: PASS (54 test functions, 20 packages, 15 с tests). `go vet ./...`: PASS. После финального изменения stored diff и MCP input schema дополнительно прошёл целевой race-набор. Python tests: 17 PASS. Все пять обновлённых skills прошли quick_validate.
 

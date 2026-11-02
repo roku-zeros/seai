@@ -34,39 +34,44 @@ type Service struct {
 	FreshnessBudget time.Duration
 }
 type Params struct {
-	WorkflowMethod  string             `json:"workflow_method,omitempty"`
-	Encoding        string             `json:"encoding,omitempty"`
-	Stored          bool               `json:"stored,omitempty"`
-	Context         map[string]string  `json:"context,omitempty"`
-	Depth           int                `json:"depth,omitempty"`
-	Schema          string             `json:"schema_version"`
-	Operation       string             `json:"operation_id,omitempty"`
-	Epoch           *int               `json:"expected_project_epoch,omitempty"`
-	Revision        *int               `json:"expected_revision,omitempty"`
-	Ref             string             `json:"ref,omitempty"`
-	Job             string             `json:"job_id,omitempty"`
-	Query           string             `json:"query,omitempty"`
-	Limit           int                `json:"limit,omitempty"`
-	Offset          int                `json:"offset,omitempty"`
-	Cursor          string             `json:"cursor,omitempty"`
-	Generation      string             `json:"index_generation_id,omitempty"`
-	Snapshot        string             `json:"source_snapshot_id,omitempty"`
-	Path            string             `json:"path,omitempty"`
-	Symbol          string             `json:"symbol_id,omitempty"`
-	Task            string             `json:"task_id,omitempty"`
-	Spec            *domain.ChangeSpec `json:"spec,omitempty"`
-	Plan            *domain.Plan       `json:"plan,omitempty"`
-	Patch           *domain.Patch      `json:"patch,omitempty"`
-	Actor           string             `json:"actor,omitempty"`
-	Digest          string             `json:"behavior_digest,omitempty"`
-	Artifact        string             `json:"artifact_digest,omitempty"`
-	Profile         string             `json:"profile_id,omitempty"`
-	ID              string             `json:"id,omitempty"`
-	Resume          string             `json:"resume_from,omitempty"`
-	ReleaseID       string             `json:"release_id,omitempty"`
-	Overlay         string             `json:"overlay_policy,omitempty"`
-	Resolution      *domain.Patch      `json:"resolution,omitempty"`
-	AllowIncomplete bool               `json:"allow_incomplete,omitempty"`
+	WaitMS          int                     `json:"wait_ms,omitempty"`
+	Research        *domain.ResearchRequest `json:"research,omitempty"`
+	ResearchJob     string                  `json:"research_job_id,omitempty"`
+	Report          *domain.ResearchReport  `json:"report,omitempty"`
+	Lease           int                     `json:"lease_epoch,omitempty"`
+	WorkflowMethod  string                  `json:"workflow_method,omitempty"`
+	Encoding        string                  `json:"encoding,omitempty"`
+	Stored          bool                    `json:"stored,omitempty"`
+	Context         map[string]string       `json:"context,omitempty"`
+	Depth           int                     `json:"depth,omitempty"`
+	Schema          string                  `json:"schema_version"`
+	Operation       string                  `json:"operation_id,omitempty"`
+	Epoch           *int                    `json:"expected_project_epoch,omitempty"`
+	Revision        *int                    `json:"expected_revision,omitempty"`
+	Ref             string                  `json:"ref,omitempty"`
+	Job             string                  `json:"job_id,omitempty"`
+	Query           string                  `json:"query,omitempty"`
+	Limit           int                     `json:"limit,omitempty"`
+	Offset          int                     `json:"offset,omitempty"`
+	Cursor          string                  `json:"cursor,omitempty"`
+	Generation      string                  `json:"index_generation_id,omitempty"`
+	Snapshot        string                  `json:"source_snapshot_id,omitempty"`
+	Path            string                  `json:"path,omitempty"`
+	Symbol          string                  `json:"symbol_id,omitempty"`
+	Task            string                  `json:"task_id,omitempty"`
+	Spec            *domain.ChangeSpec      `json:"spec,omitempty"`
+	Plan            *domain.Plan            `json:"plan,omitempty"`
+	Patch           *domain.Patch           `json:"patch,omitempty"`
+	Actor           string                  `json:"actor,omitempty"`
+	Digest          string                  `json:"behavior_digest,omitempty"`
+	Artifact        string                  `json:"artifact_digest,omitempty"`
+	Profile         string                  `json:"profile_id,omitempty"`
+	ID              string                  `json:"id,omitempty"`
+	Resume          string                  `json:"resume_from,omitempty"`
+	ReleaseID       string                  `json:"release_id,omitempty"`
+	Overlay         string                  `json:"overlay_policy,omitempty"`
+	Resolution      *domain.Patch           `json:"resolution,omitempty"`
+	AllowIncomplete bool                    `json:"allow_incomplete,omitempty"`
 }
 
 type Job struct {
@@ -82,10 +87,18 @@ func (s *Service) Handle(ctx context.Context, method string, p Params) (any, err
 		return nil, domain.Err("SCHEMA_INVALID", "schema_version must be %s", domain.API)
 	}
 	switch method {
+	case "research.start":
+		return s.startResearch(ctx, p)
+	case "research.get":
+		return s.researchStatus(ctx, p)
+	case "research.claim", "research.report":
+		return s.researchControl(ctx, method, p)
+	case "research.cancel":
+		return s.cancelResearch(ctx, p)
 	case "workflow.submit":
 		return s.submitWorkflow(ctx, p)
 	case "handshake":
-		return map[string]string{"schema_version": domain.API, "server_version": "0.4.2-dev"}, nil
+		return map[string]string{"schema_version": domain.API, "server_version": "0.4.3-dev"}, nil
 	case "capabilities.get":
 		capabilities := map[string]any{"source_policy": workspace.SourcePolicy, "excluded_metadata": workspace.MetadataExclusions(), "async_workspace_check": true, "business_rules": true, "business_flow": true, "business_impact": true, "business_configured": s.Config.Business != nil && len(s.Config.Business.Adapters) > 0, "business_checks": true, "runner_profiles": checks.ProfileSummaries(s.Profiles), "release_reconciliation": true, "backup_restore": true, "worker_runtime": true, "structural_search": true, "snapshot_reads": true, "text_search": true, "typed_references": true, "static_calls": true, "task_contracts": true, "candidate_patches": true, "product_checks": len(s.Profiles) > 0, "interactive_human_approval": true, "snapshot_modes": []string{"working_tree", "explicit_ref"}, "provider_ready": s.Provider != nil && s.Provider.Verified(), "multi_agent_ready": false, "pilot_ready": false, "blocking_issues": []string{"P0 Qwen and GigaCode profiles are unverified", "domain patterns and verification isolation are unconfigured", "runner isolation, actual Qwen/GigaCode and pilot domain coverage require P0 verification"}, "limitations": indexer.Limitations}
 		blockers := []string{"P0 actual Qwen/GigaCode and product acceptance remain unverified"}
@@ -111,6 +124,11 @@ func (s *Service) Handle(ctx context.Context, method string, p Params) (any, err
 			budget = DefaultFreshnessBudget
 		}
 		capabilities["freshness_budget_seconds"] = budget.Seconds()
+		capabilities["parallel_research"] = true
+		capabilities["research_coordination_ready"] = true
+		capabilities["research_client_verified"] = false
+		capabilities["research_max_workers"] = s.researchWorkers()
+		capabilities["research_execution"] = "external GigaCode workers; daemon schedules and validates reports, does not spawn client agents"
 		capabilities["blocking_issues"] = blockers
 		return capabilities, nil
 	case "project.get":

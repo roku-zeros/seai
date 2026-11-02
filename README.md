@@ -1,8 +1,10 @@
 # SEAI — начало реализации на Go
 
+**Параллельный ресерч:** [GigaCode workers через SEAI](docs/PARALLEL_RESEARCH.md) — два исследователя одновременно по умолчанию, до четырёх по конфигурации, общий generation и сохранённые evidence reports. Отдельный Qwen endpoint не нужен; фактический fork запускает GigaCode.
+
 **GigaCode: медленно и много подтверждений?** В 0.4.2 добавлен прямой stdio MCP: чтения закрепляют индекс автоматически и обходятся без shell. Настройка доверия ограничена SEAI; команды создания/планирования/патча поддерживают async receipt. [Установка MCP и обновление существующей установки](docs/GIGACODE_MCP.md).
 
-Рабочий фундамент по [спецификации v1](docs/specification-v1.md). Версия `0.4.2-dev`: исследование → контракт → candidate → зарегистрированные проверки/review; Qwen workers, release rebase и backup/restore/подготовка upgrade. Это ещё не готовый пилот.
+Рабочий фундамент по [спецификации v1](docs/specification-v1.md). Версия `0.4.3-dev`: исследование → контракт → candidate → зарегистрированные проверки/review; Qwen workers, release rebase и backup/restore/подготовка upgrade. Это ещё не готовый пилот.
 
 Реализованы два бинарника: CLI `seai` и единственный writer `seaid`. CLI обращается к daemon через Unix socket и JSON-RPC 2.0 с handshake `seai.api/v1`. Daemon сохраняет задания в SQLite (WAL, foreign keys, synchronous FULL), снимает исходники Git в SHA-256 CAS, строит отдельный индекс AST/types через `go/packages` и транзакционно публикует готовое поколение вместе с событием и результатом задания. Поиск точных идентификаторов и подстрок возвращает evidence из сохранённых байтов, а не из текущего checkout.
 

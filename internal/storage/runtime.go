@@ -67,7 +67,7 @@ func Open(root string) (*Runtime, error) {
 	if latest > 3 {
 		return fail(fmt.Errorf("UNSUPPORTED_RUNTIME_SCHEMA: %d", latest))
 	}
-	for _, stmt := range []string{"UPDATE runs SET state='ABORTED',lease_epoch=lease_epoch+1,error='daemon restarted; resume explicitly' WHERE state IN ('QUEUED','RUNNING')", "UPDATE execution_nodes SET state='ABORTED',lease_epoch=lease_epoch+1,error='daemon restarted' WHERE state='RUNNING'", "UPDATE check_runs SET status='ABORTED' WHERE status='RUNNING'"} {
+	for _, stmt := range []string{"UPDATE runs SET state='ABORTED',lease_epoch=lease_epoch+1,error='daemon restarted; resume explicitly' WHERE state IN ('QUEUED','RUNNING')", "UPDATE execution_nodes SET state='ABORTED',lease_epoch=lease_epoch+1,error='daemon restarted' WHERE state IN ('QUEUED','RUNNING')", "UPDATE check_runs SET status='ABORTED' WHERE status='RUNNING'"} {
 		if _, e = db.Exec(stmt); e != nil {
 			return fail(e)
 		}

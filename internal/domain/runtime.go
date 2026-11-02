@@ -44,6 +44,7 @@ type ProviderProfile struct {
 	MaxTaskTokens     int    `json:"max_task_tokens"`
 }
 type RuntimeConfig struct {
+	ResearchMaxWorkers     int              `json:"research_max_workers,omitempty"`
 	FreshnessBudgetSeconds int              `json:"freshness_budget_seconds,omitempty"`
 	Business               *BusinessConfig  `json:"business,omitempty"`
 	Schema                 string           `json:"schema_version"`

@@ -35,7 +35,7 @@ class InstallTests(InstallFixture, unittest.TestCase):
         self.assertTrue(first["written"])
         self.assertTrue(memory.read_text().startswith("User instructions\n"))
         self.assertEqual(memory.read_text().count("SEAI-ONLY:BEGIN"), 1)
-        self.assertEqual(len(list((self.project / ".gigacode/skills").glob("*/SKILL.md"))), 5)
+        self.assertEqual(len(list((self.project / ".gigacode/skills").glob("*/SKILL.md"))), 6)
         self.assertEqual(self.install()["written"], [])
         ignored = subprocess.check_output(["git", "-C", str(self.project), "check-ignore", ".gigacode/seai/session.json"], text=True)
         self.assertTrue(ignored.strip())
@@ -61,7 +61,7 @@ class InstallTests(InstallFixture, unittest.TestCase):
 
     def test_vscode_layout_and_symlink_destination(self):
         self.install("vscode")
-        self.assertEqual(len(list((self.project / ".gigacode_vsc/skills").glob("*/SKILL.md"))), 5)
+        self.assertEqual(len(list((self.project / ".gigacode_vsc/skills").glob("*/SKILL.md"))), 6)
         other = self.base / "outside"
         other.mkdir()
         (self.project / ".gigacode/skills").symlink_to(other, target_is_directory=True)
@@ -87,7 +87,7 @@ class WorkspaceTests(InstallFixture, unittest.TestCase):
         self.assertTrue((self.base / "GIGACODE.md").is_file())
         self.assertFalse((self.project / ".gigacode").exists())
         self.assertEqual(original.read_text(), "Child project instructions\n")
-        self.assertEqual(len(list((self.base / ".gigacode/skills").glob("*/SKILL.md"))), 5)
+        self.assertEqual(len(list((self.base / ".gigacode/skills").glob("*/SKILL.md"))), 6)
         self.assertEqual(installer.install(self.project, self.binary, self.data, "cli", self.base)["written"], [])
         status = installer.check(self.base, self.project)
         self.assertEqual(status["status"], "files_configured")

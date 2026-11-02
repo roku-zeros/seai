@@ -207,6 +207,9 @@ func (s *Service) startRun(ctx context.Context, method string, p Params, work ru
 		if err != nil {
 			state = "FAILED"
 			message = err.Error()
+			if researchNeedsInput(method, err) {
+				state = "NEEDS_INPUT"
+			}
 		}
 		if runctx.Err() != nil {
 			state = "CANCELLED"

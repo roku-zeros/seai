@@ -35,6 +35,9 @@ def install(project, binary, data, layout, workspace=None, upgrade=False):
         raise ValueError("SEAI source skill bundle is missing")
     for src in skill_sources:
         planned[workspace / prefix / "skills" / src.parent.name / src.name] = src.read_bytes()
+    if layout == "cli":
+        for src in sorted((SOURCE / ".gigacode/agents").glob("seai-*.md")):
+            planned[workspace / ".gigacode/agents" / src.name] = src.read_bytes()
     planned[workspace / ".gigacode/seai/POLICY.md"] = (SOURCE / ".gigacode/seai/POLICY.md").read_bytes()
     session = {"seai_bin": str(binary), "data_dir": str(data), "project_root": str(project)}
     planned[workspace / ".gigacode/seai/session.json"] = (json.dumps(session, indent=2) + "\n").encode()
