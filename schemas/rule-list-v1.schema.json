@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/rule-list-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "source_snapshot_id": {
+      "type": "string"
+    },
+    "index_generation_id": {
+      "type": "string"
+    },
+    "historical_or_explicit": {
+      "type": "boolean"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "business-rule-v1.schema.json"
+      }
+    },
+    "total": {
+      "type": "integer"
+    },
+    "next_offset": {
+      "type": "integer"
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "configured": {
+      "type": "boolean"
+    },
+    "config_digest": {
+      "type": "string"
+    },
+    "extractor_version": {
+      "type": "string"
+    },
+    "coverage": {
+      "const": "partial"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "source_snapshot_id",
+    "index_generation_id",
+    "historical_or_explicit",
+    "rules",
+    "total",
+    "truncated",
+    "config_digest"
+  ]
+}

@@ -1,6 +1,6 @@
 # SEAI — начало реализации на Go
 
-Рабочий фундамент по [спецификации v1](docs/specification-v1.md). Версия `0.3.0-dev`: исследование → контракт → candidate → зарегистрированные проверки/review; Qwen workers, release rebase и backup/restore/подготовка upgrade. Это ещё не готовый пилот.
+Рабочий фундамент по [спецификации v1](docs/specification-v1.md). Версия `0.4.0-dev`: исследование → контракт → candidate → зарегистрированные проверки/review; Qwen workers, release rebase и backup/restore/подготовка upgrade. Это ещё не готовый пилот.
 
 Реализованы два бинарника: CLI `seai` и единственный writer `seaid`. CLI обращается к daemon через Unix socket и JSON-RPC 2.0 с handshake `seai.api/v1`. Daemon сохраняет задания в SQLite (WAL, foreign keys, synchronous FULL), снимает исходники Git в SHA-256 CAS, строит отдельный индекс AST/types через `go/packages` и транзакционно публикует готовое поколение вместе с событием и результатом задания. Поиск точных идентификаторов и подстрок возвращает evidence из сохранённых байтов, а не из текущего checkout.
 
@@ -24,6 +24,12 @@ python3 scripts/install_gigacode_skills.py \
 После установки запусти новую GigaCode CLI-сессию из указанного workspace, проверь `/skills` и `/memory`. Затем можно писать обычное «Объясни функцию Eligible» — повторять «используй SEAI» в каждом запросе не требуется правилом. Для первоначальной установки самого инструмента есть [отдельный runbook](docs/AGENT_QUICKSTART.md). `/seai:setup` и `/seai:ask` в checkout SEAI теперь подключают установленный daemon и исследуют код в том же режиме.
 
 Через SEAI доступны file/symbol reads, literal text search, typed refs/static calls, связанные тесты, ChangeSpec/plan, интерактивное подтверждение человеком, candidate patches и diff/export. [Новые команды и ограничения](docs/WORKFLOW.md). Проверки настраивает оператор; без профилей и независимого review export остаётся диагностическим. [Команды этапов 4–6](docs/EXECUTION.md). GigaCode на конкретной машине и native MCP пока не проверены/не реализованы.
+
+## Бизнес-логика в Go
+
+В 0.4 добавлены настраиваемые typed adapters для Go-структур/таблиц правил, функций регистрации и обычных бизнес-функций. Доступны `rules discover/search/show/diagnostics`, `flow` и `impact`; обычный search также ищет Rule ID. Business checks показывают normal/boundary/exception/combination cases, baseline/candidate differences и проверку rule trace при наличии адаптера.
+
+[Настройка под ваш Go-проект и команды проверки](docs/BUSINESS.md). Начните с discovery и настройки package/type/function identities: SEAI не угадывает все формы бизнес-логики. Coverage/gaps возвращаются явно. Для проверки поставки — `make business-smoke`; Qwen для него не нужен.
 
 ## Qwen: настройте endpoint позже
 
@@ -97,6 +103,6 @@ Qwen/workers, product runner, domain extractors, incremental index, MCP/broker, 
 
 Unit/component tests проверяют канонические identities без потери целочисленной точности, CAS corruption, path traversal, symlink, dirty/ref snapshots, idempotency, optimistic epoch, rollback публикации, checksums миграции и recovery заданий. Интеграционный тест строит индекс синтетического Go-репозитория и проверяет поиск после live-правки и открытия runtime заново. `make smoke` дополнительно запускает реальные бинарники, Unix RPC и restart daemon.
 
-Зависимости обновлены для Go 1.26.6: `golang.org/x/tools v0.52.0`, `golang.org/x/mod v0.42.0`, `golang.org/x/sync v0.24.0`, `github.com/mattn/go-sqlite3 v1.14.52`. После обновления остановите старый seaid, пересоберите бинарники, запустите новый daemon с прежними --repo/--data/--project, затем выполните `index build --wait`: версия анализатора повышена до `structural-v3`, новое задание создаст отдельное поколение. Runtime получает additive migrations 002 и 003; уже выпущенные migrations 001/002 не изменены. Для сохранения и переноса данных используйте [backup/restore и staged upgrade](docs/EXECUTION.md#backup-restore-и-обновление-самого-seai).
+Зависимости обновлены для Go 1.26.6: `golang.org/x/tools v0.52.0`, `golang.org/x/mod v0.42.0`, `golang.org/x/sync v0.24.0`, `github.com/mattn/go-sqlite3 v1.14.52`. После обновления остановите старый seaid, пересоберите бинарники, запустите новый daemon с прежними --repo/--data/--project, затем выполните `index build --wait`: версия анализатора повышена до `structural-v4`, новое задание создаст отдельное поколение. Runtime получает additive migrations 002 и 003; уже выпущенные migrations 001/002 не изменены. Для сохранения и переноса данных используйте [backup/restore и staged upgrade](docs/EXECUTION.md#backup-restore-и-обновление-самого-seai).
 
 Технические основания: [go/packages](https://pkg.go.dev/golang.org/x/tools/go/packages) и [SQLite WAL](https://www.sqlite.org/wal.html). Версии для корпоративной поставки требуют отдельной проверки, текущие pins выбраны по совместимости с Go 1.26.6 и закреплены в go.mod/go.sum.

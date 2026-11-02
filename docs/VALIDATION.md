@@ -1,4 +1,28 @@
-# Проверки 0.3.0-dev — этапы 4–6
+# Проверки 0.4.0-dev — Go business index, impact и бизнес-прогоны
+
+2 ноября 2026, macOS arm64, Go 1.26.6. Полная race suite и адресные повторы новых сценариев прошли: 41 test functions в корневом модуле; 17 пакетов собираются, 12 имеют собственные tests. Дополнительно fixtures/business имеет два Go tests и исполняемый JSON probe.
+
+| Проверка | Результат |
+|---|---|
+| `go test -race -p 1 -timeout 180s ./...` и адресные повторы business/reviewer/DAG | PASS |
+| `go vet ./...`, business fixture race tests/vet | PASS |
+| `go mod tidy -diff`, `go mod verify` | PASS: diff пуст, all modules verified |
+| CLI/daemon build | PASS: 0.4.0-dev, Go 1.26.6 |
+| Installer Python tests / skills quick_validate | PASS: 11 installer tests, все 5 skills |
+| Прежний CLI/Unix smoke с JSON Schema validation | PASS: structural workflow, patch/checks, restart, backup/restore и staged upgrade совместимы |
+| Новый business CLI smoke с JSON Schema validation | PASS: typed Go registrations, duplicate IDs по context, flow/constants, shared impact обоих продуктов, strict candidate analysis, 9 реальных baseline/candidate fixtures, category/trace coverage, generation pinning и restart |
+
+Component scenarios: typed struct/call/function adapters; отсутствие совпадения по одному имени у чужого типа/функции; dynamic ID/indirect handler diagnostics; config в generation identity; historical config и stale guards; plan evidence бизнес-регистрации; traversal limits; shared helper в отдельном файле затрагивает оба продукта. Candidate gate не принимает новую неизвестную регистрацию; удаление регистрации сохраняет прежний rule/context в regression obligations. Reviewer выбирает проверенный candidate generation и отвергает несовпавший checkpoint; его evidence может ссылаться на явно различённые baseline/candidate источники. Existing Qwen deterministic-stub DAG/resume tests сохранены.
+
+Comparison tests проверяют required case categories, fixture digest при изменении coverage semantics, baseline drift, actual trace mismatch и missing coverage. CLI smoke выполняет refactor общего helper без изменения expected outcomes; он не обучает expectations по текущему stdout и не меняет основной source checkout.
+
+Первый параллельный race build остановился при линковке из-за `no space left on device`. Удалён только выделенный build cache SEAI; последовательный повтор `-p 1` прошёл. Пользовательские файлы не удалялись.
+
+Это проверка синтетических Go-проектов. Реальные AST-паттерны вашего продукта, GigaCode, Qwen endpoint и Docker по-прежнему требуют боевого прогона. Coverage partial: декларация/факт/trace тестового адаптера не равны полному runtime/branch coverage. Инструкция и ограничения — [BUSINESS.md](BUSINESS.md). Runtime schema остаётся 3; индекс structural-v4/business-v1 требует нового index build, старые поколения сохранены.
+
+---
+
+## Исторические проверки 0.3.0-dev — этапы 4–6
 
 31 октября 2026, macOS arm64, официальный Go 1.26.6; CGO SQLite v1.14.52. Проверка локальной реализации и синтетического стенда, не приёмка продукта.
 

@@ -81,6 +81,12 @@
       "items": {
         "type": "string"
       }
+    },
+    "business_rules": {
+      "type": "array",
+      "items": {
+        "$ref": "business-rule-v1.schema.json"
+      }
     }
   },
   "required": [

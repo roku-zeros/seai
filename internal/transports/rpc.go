@@ -75,11 +75,11 @@ func Handler(s *application.Service) http.Handler {
 			env.Status = "error"
 			env.Error = de
 			env.Data = nil
-		} else if result, ok := data.(map[string]any); ok && result["truncated"] == true {
+		} else if result, ok := data.(map[string]any); ok && (result["truncated"] == true || result["coverage"] == "partial") {
 			env.Status = "partial"
 		} else if result, ok := data.(domain.SearchResult); ok {
 			env.Status = "partial"
-			if len(result.Hits) == 0 {
+			if len(result.Hits) == 0 && len(result.BusinessRules) == 0 {
 				env.Status = "empty"
 			}
 		}

@@ -238,6 +238,13 @@ func (s *Service) verify(ctx context.Context, run string, t domain.Task, profile
 		return nil, e
 	}
 	results := []domain.CheckResult{}
+	if s.Config.Business != nil && s.Config.Business.RequireForChanges {
+		result, e := s.verifyBusiness(ctx, run, t, candidate)
+		results = append(results, result)
+		if e != nil {
+			return results, e
+		}
+	}
 	for _, name := range names {
 		p, ok := s.Profiles[name]
 		if !ok {
@@ -292,8 +299,16 @@ func (s *Service) checkSummary(ctx context.Context, t domain.Task) map[string]an
 	if active > 0 {
 		all = false
 	}
-	for _, name := range t.Plan.Checks {
+	names := append([]string{}, t.Plan.Checks...)
+	if s.Config.Business != nil && s.Config.Business.RequireForChanges {
+		names = append([]string{"domain-analysis"}, names...)
+	}
+	for _, name := range names {
 		p, ok := s.Profiles[name]
+		if name == "domain-analysis" {
+			ok = true
+			p = domain.CheckProfile{Kind: "domain"}
+		}
 		if !ok {
 			all = false
 			continue

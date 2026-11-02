@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/business-rule-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "entity_id": {
+      "type": "string"
+    },
+    "rule_key": {
+      "type": "string"
+    },
+    "adapter": {
+      "type": "string"
+    },
+    "declared_priority": {
+      "type": "string"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "certainty": {
+      "enum": [
+        "exact",
+        "possible",
+        "unresolved"
+      ]
+    },
+    "handlers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "symbol_id": {
+            "type": "string"
+          },
+          "qualified_name": {
+            "type": "string"
+          },
+          "certainty": {
+            "enum": [
+              "exact",
+              "possible",
+              "unresolved"
+            ]
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "evidence_id": {
+                "type": "string"
+              },
+              "file_path": {
+                "type": "string"
+              },
+              "blob_digest": {
+                "type": "string"
+              },
+              "snippet": {
+                "type": "string"
+              },
+              "start_byte": {
+                "type": "integer"
+              },
+              "end_byte": {
+                "type": "integer"
+              },
+              "snippet_truncated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "evidence_id",
+              "file_path",
+              "blob_digest",
+              "snippet",
+              "start_byte",
+              "end_byte"
+            ]
+          }
+        },
+        "required": [
+          "role",
+          "certainty",
+          "evidence"
+        ]
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "type": "string"
+        },
+        "file_path": {
+          "type": "string"
+        },
+        "blob_digest": {
+          "type": "string"
+        },
+        "snippet": {
+          "type": "string"
+        },
+        "start_byte": {
+          "type": "integer"
+        },
+        "end_byte": {
+          "type": "integer"
+        },
+        "snippet_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "file_path",
+        "blob_digest",
+        "snippet",
+        "start_byte",
+        "end_byte"
+      ]
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rule_key": {
+            "type": "string"
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "content_digest": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "rule_key",
+          "external_id",
+          "revision",
+          "content_digest"
+        ]
+      }
+    }
+  },
+  "required": [
+    "entity_id",
+    "rule_key",
+    "adapter",
+    "context",
+    "certainty",
+    "handlers",
+    "evidence",
+    "requirements"
+  ]
+}

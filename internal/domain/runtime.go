@@ -3,27 +3,34 @@ package domain
 import "encoding/json"
 
 type Fixture struct {
-	ID           string          `json:"id"`
-	Input        string          `json:"input"`
-	Expected     json.RawMessage `json:"expected"`
-	Criteria     []string        `json:"criterion_ids"`
-	AllowedPaths []string        `json:"allowed_paths"`
+	Context          map[string]string `json:"context,omitempty"`
+	RuleKeys         []string          `json:"rule_keys,omitempty"`
+	Category         string            `json:"category,omitempty"`
+	Description      string            `json:"description,omitempty"`
+	BaselineExpected json.RawMessage   `json:"expected_baseline,omitempty"`
+	ID               string            `json:"id"`
+	Input            string            `json:"input"`
+	Expected         json.RawMessage   `json:"expected"`
+	Criteria         []string          `json:"criterion_ids"`
+	AllowedPaths     []string          `json:"allowed_paths"`
 }
 type CheckProfile struct {
-	ID               string    `json:"id"`
-	Kind             string    `json:"kind"` // compile, tests, comparison
-	Program          string    `json:"program"`
-	Args             []string  `json:"args"`
-	Isolation        string    `json:"isolation"` // local-approved or docker
-	AcknowledgeLocal bool      `json:"acknowledge_local_execution,omitempty"`
-	DockerImage      string    `json:"docker_image,omitempty"`
-	TimeoutSeconds   int       `json:"timeout_seconds"`
-	MaxOutputBytes   int       `json:"max_output_bytes"`
-	MemoryMB         int       `json:"memory_mb"`
-	CPUs             int       `json:"cpus"`
-	AssertionProfile string    `json:"assertion_profile,omitempty"`
-	TestNames        []string  `json:"test_names,omitempty"`
-	Fixtures         []Fixture `json:"fixtures,omitempty"`
+	RequiredCases    []CaseRequirement `json:"required_cases,omitempty"`
+	RuleTracePath    string            `json:"rule_trace_path,omitempty"`
+	ID               string            `json:"id"`
+	Kind             string            `json:"kind"` // compile, tests, comparison
+	Program          string            `json:"program"`
+	Args             []string          `json:"args"`
+	Isolation        string            `json:"isolation"` // local-approved or docker
+	AcknowledgeLocal bool              `json:"acknowledge_local_execution,omitempty"`
+	DockerImage      string            `json:"docker_image,omitempty"`
+	TimeoutSeconds   int               `json:"timeout_seconds"`
+	MaxOutputBytes   int               `json:"max_output_bytes"`
+	MemoryMB         int               `json:"memory_mb"`
+	CPUs             int               `json:"cpus"`
+	AssertionProfile string            `json:"assertion_profile,omitempty"`
+	TestNames        []string          `json:"test_names,omitempty"`
+	Fixtures         []Fixture         `json:"fixtures,omitempty"`
 }
 type ProviderProfile struct {
 	Endpoint          string `json:"endpoint"`
@@ -37,6 +44,7 @@ type ProviderProfile struct {
 	MaxTaskTokens     int    `json:"max_task_tokens"`
 }
 type RuntimeConfig struct {
+	Business        *BusinessConfig  `json:"business,omitempty"`
 	Schema          string           `json:"schema_version"`
 	Checks          []CheckProfile   `json:"checks"`
 	Provider        *ProviderProfile `json:"provider,omitempty"`
@@ -45,18 +53,21 @@ type RuntimeConfig struct {
 	MaxRunSeconds   int              `json:"max_run_seconds"`
 }
 type CheckResult struct {
-	ProfileID     string       `json:"profile_id"`
-	Status        string       `json:"status"`
-	ExitCode      int          `json:"exit_code"`
-	StdoutDigest  string       `json:"stdout_digest,omitempty"`
-	StderrDigest  string       `json:"stderr_digest,omitempty"`
-	Tests         []string     `json:"passed_tests"`
-	Criteria      []string     `json:"criterion_ids"`
-	Differences   []Difference `json:"differences"`
-	FixtureDigest string       `json:"fixture_digest,omitempty"`
-	DurationMS    int64        `json:"duration_ms"`
-	Isolation     string       `json:"isolation"`
-	Error         string       `json:"error,omitempty"`
+	Domain           *BusinessVerification  `json:"domain_verification,omitempty"`
+	BusinessCases    []BusinessCaseResult   `json:"business_cases,omitempty"`
+	BusinessCoverage []BusinessCaseCoverage `json:"business_coverage,omitempty"`
+	ProfileID        string                 `json:"profile_id"`
+	Status           string                 `json:"status"`
+	ExitCode         int                    `json:"exit_code"`
+	StdoutDigest     string                 `json:"stdout_digest,omitempty"`
+	StderrDigest     string                 `json:"stderr_digest,omitempty"`
+	Tests            []string               `json:"passed_tests"`
+	Criteria         []string               `json:"criterion_ids"`
+	Differences      []Difference           `json:"differences"`
+	FixtureDigest    string                 `json:"fixture_digest,omitempty"`
+	DurationMS       int64                  `json:"duration_ms"`
+	Isolation        string                 `json:"isolation"`
+	Error            string                 `json:"error,omitempty"`
 }
 type Difference struct {
 	Fixture        string          `json:"fixture_id"`
@@ -78,17 +89,18 @@ type WorkerResult struct {
 	Verdict  string   `json:"verdict,omitempty"`
 }
 type ReleasePlan struct {
-	ID             string   `json:"plan_id"`
-	ReleaseID      string   `json:"release_id"`
-	Ref            string   `json:"ref"`
-	Commit         string   `json:"resolved_commit"`
-	Source         string   `json:"source_snapshot_id"`
-	FromSource     string   `json:"from_snapshot_id"`
-	FromGeneration string   `json:"from_generation_id"`
-	Epoch          int      `json:"from_project_epoch"`
-	Extractor      string   `json:"extractor_version"`
-	Paths          []string `json:"changed_paths"`
-	Tasks          []string `json:"affected_tasks"`
+	BusinessConfigDigest string   `json:"business_config_digest,omitempty"`
+	ID                   string   `json:"plan_id"`
+	ReleaseID            string   `json:"release_id"`
+	Ref                  string   `json:"ref"`
+	Commit               string   `json:"resolved_commit"`
+	Source               string   `json:"source_snapshot_id"`
+	FromSource           string   `json:"from_snapshot_id"`
+	FromGeneration       string   `json:"from_generation_id"`
+	Epoch                int      `json:"from_project_epoch"`
+	Extractor            string   `json:"extractor_version"`
+	Paths                []string `json:"changed_paths"`
+	Tasks                []string `json:"affected_tasks"`
 }
 type Conflict struct {
 	Path         string `json:"path"`
@@ -116,4 +128,41 @@ type UpgradeBundle struct {
 	SeaiDigest    string `json:"seai_digest"`
 	Seaid         string `json:"seaid"`
 	SeaidDigest   string `json:"seaid_digest"`
+}
+
+type CaseRequirement struct {
+	RuleKey    string            `json:"rule_key"`
+	Context    map[string]string `json:"context,omitempty"`
+	Categories []string          `json:"categories"`
+}
+type BusinessCaseResult struct {
+	Fixture          string            `json:"fixture_id"`
+	Category         string            `json:"category,omitempty"`
+	RuleKeys         []string          `json:"rule_keys,omitempty"`
+	Context          map[string]string `json:"context,omitempty"`
+	Description      string            `json:"description,omitempty"`
+	Status           string            `json:"status"`
+	BaselineMatched  *bool             `json:"baseline_matched,omitempty"`
+	CandidateMatched bool              `json:"candidate_matched"`
+	ObservedRules    []string          `json:"observed_rules,omitempty"`
+	TraceVerified    bool              `json:"trace_verified"`
+	Differences      []Difference      `json:"differences"`
+}
+type BusinessCaseCoverage struct {
+	RuleKey       string            `json:"rule_key"`
+	Context       map[string]string `json:"context,omitempty"`
+	Required      []string          `json:"required_categories"`
+	Passed        []string          `json:"passed_categories"`
+	Missing       []string          `json:"missing_categories"`
+	TraceVerified bool              `json:"trace_verified"`
+}
+
+type BusinessVerification struct {
+	RemovedRules []BusinessRule       `json:"removed_rules,omitempty"`
+	Source       string               `json:"source_snapshot_id"`
+	Generation   string               `json:"index_generation_id"`
+	RuleIDs      []string             `json:"affected_rule_ids"`
+	Diagnostics  []BusinessDiagnostic `json:"diagnostics"`
+	Gaps         []string             `json:"coverage_gaps"`
+	Coverage     string               `json:"coverage"`
 }

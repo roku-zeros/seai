@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/business-config-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "seai.business/v1"
+    },
+    "adapters": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "package": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "id_field": {
+            "type": "string"
+          },
+          "priority_field": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "struct",
+              "call",
+              "function"
+            ]
+          },
+          "handler_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "context_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "id_arg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 63
+          },
+          "handler_args": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 63
+            }
+          },
+          "context_args": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 63
+            }
+          },
+          "priority_arg": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 63
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "package",
+          "symbol"
+        ]
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rule_key": {
+            "type": "string"
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "content_digest": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "rule_key",
+          "external_id",
+          "revision",
+          "content_digest",
+          "content"
+        ]
+      }
+    },
+    "require_for_changes": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schema_version",
+    "adapters"
+  ]
+}

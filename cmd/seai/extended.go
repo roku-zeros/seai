@@ -22,6 +22,9 @@ type extendedOptions struct {
 }
 
 func parseExtended(args []string) (string, application.Params, extendedOptions, error) {
+	if len(args) > 0 && (args[0] == "rules" || args[0] == "flow" || args[0] == "impact") {
+		return parseBusiness(args)
+	}
 	if isRuntime(args) {
 		return parseRuntime(args)
 	}

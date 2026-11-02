@@ -1,4 +1,14 @@
-# Статус реализации 0.3.0-dev
+# Статус реализации 0.4.0-dev
+
+Добавлены три запрошенных направления: typed предметный Go-индекс; bounded flow/impact с shared consumers; бизнес-сценарии и comparison reports. Поддержаны struct/call/function adapters, constant IDs/context/priority, handlers и source facts, revisioned requirement links, duplicate IDs по context и явные diagnostics. Адаптеры и их config входят в identity structural-v4/business-v1; старые поколения сохраняются.
+
+При require_for_changes:true проверяется candidate domain graph и наличие business fixtures для затронутых rule/context, включая обратные потребители shared helpers. Business cases различают normal/boundary/exception/combination/regression, optional baseline expectation и optional observed trace. Required categories/trace входят в fixture_digest. Readiness не обходит checks/AC/independent review.
+
+Команды, настройка реального Go-проекта и ограничения — [BUSINESS.md](BUSINESS.md). Поставка проверяется на fixtures/business; универсальное распознавание любых Go-конструкций, полный runtime/branch graph, фактический GigaCode/Qwen/Docker и продуктовая приёмка не заявляются. Rules остаются в Go; config задаёт только typed mapping и утверждённые ожидания. Новая SQL migration не нужна: runtime schema 3, immutable index schema/version обновлены.
+
+---
+
+# Исторический статус реализации 0.3.0-dev
 
 Этап 4: operator check profiles, private snapshot execution, timeout/cancel/process groups, bounded durable logs, go test JSON evidence, exact baseline/candidate comparison и привязка AC к fixture_digest; readiness и независимый human review.
 

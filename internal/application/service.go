@@ -33,6 +33,8 @@ type Service struct {
 	cancellations map[string]context.CancelFunc
 }
 type Params struct {
+	Context         map[string]string  `json:"context,omitempty"`
+	Depth           int                `json:"depth,omitempty"`
 	Schema          string             `json:"schema_version"`
 	Operation       string             `json:"operation_id,omitempty"`
 	Epoch           *int               `json:"expected_project_epoch,omitempty"`
@@ -77,9 +79,29 @@ func (s *Service) Handle(ctx context.Context, method string, p Params) (any, err
 	}
 	switch method {
 	case "handshake":
-		return map[string]string{"schema_version": domain.API, "server_version": "0.3.0-dev"}, nil
+		return map[string]string{"schema_version": domain.API, "server_version": "0.4.0-dev"}, nil
 	case "capabilities.get":
-		return map[string]any{"runner_profiles": checks.ProfileSummaries(s.Profiles), "release_reconciliation": true, "backup_restore": true, "worker_runtime": true, "structural_search": true, "snapshot_reads": true, "text_search": true, "typed_references": true, "static_calls": true, "task_contracts": true, "candidate_patches": true, "product_checks": len(s.Profiles) > 0, "interactive_human_approval": true, "snapshot_modes": []string{"working_tree", "explicit_ref"}, "provider_ready": s.Provider != nil && s.Provider.Verified(), "multi_agent_ready": false, "pilot_ready": false, "blocking_issues": []string{"P0 Qwen and GigaCode profiles are unverified", "domain patterns and verification isolation are unconfigured", "runner isolation, actual Qwen/GigaCode and pilot domain coverage require P0 verification"}, "limitations": indexer.Limitations}, nil
+		capabilities := map[string]any{"business_rules": true, "business_flow": true, "business_impact": true, "business_configured": s.Config.Business != nil && len(s.Config.Business.Adapters) > 0, "business_checks": true, "runner_profiles": checks.ProfileSummaries(s.Profiles), "release_reconciliation": true, "backup_restore": true, "worker_runtime": true, "structural_search": true, "snapshot_reads": true, "text_search": true, "typed_references": true, "static_calls": true, "task_contracts": true, "candidate_patches": true, "product_checks": len(s.Profiles) > 0, "interactive_human_approval": true, "snapshot_modes": []string{"working_tree", "explicit_ref"}, "provider_ready": s.Provider != nil && s.Provider.Verified(), "multi_agent_ready": false, "pilot_ready": false, "blocking_issues": []string{"P0 Qwen and GigaCode profiles are unverified", "domain patterns and verification isolation are unconfigured", "runner isolation, actual Qwen/GigaCode and pilot domain coverage require P0 verification"}, "limitations": indexer.Limitations}
+		blockers := []string{"P0 actual Qwen/GigaCode and product acceptance remain unverified"}
+		if s.Config.Business == nil || len(s.Config.Business.Adapters) == 0 {
+			blockers = append(blockers, "business adapters are not configured; use rules discover")
+		}
+		if len(s.Profiles) == 0 {
+			blockers = append(blockers, "registered product checks are not configured")
+		}
+		local, docker := false, false
+		for _, p := range s.Profiles {
+			local = local || p.Isolation == "local-approved"
+			docker = docker || p.Isolation == "docker"
+		}
+		if local {
+			blockers = append(blockers, "local-approved checks do not provide OS isolation")
+		}
+		if docker {
+			blockers = append(blockers, "Docker isolation requires verification on the operator host")
+		}
+		capabilities["blocking_issues"] = blockers
+		return capabilities, nil
 	case "project.get":
 		var id, root string
 		var gen sql.NullString
@@ -101,6 +123,8 @@ func (s *Service) Handle(ctx context.Context, method string, p Params) (any, err
 	case "search.entities":
 		return s.research(ctx, method, p)
 
+	case "rules.search", "rules.get", "rules.discover", "rules.diagnostics", "flow.get", "impact.get":
+		return s.businessQuery(ctx, method, p)
 	case "workspace.status", "files.list", "file.read", "symbol.get", "references.find", "calls.list", "tests.related", "search.text":
 		return s.research(ctx, method, p)
 	case "checks.profiles", "checks.run", "task.verify", "runs.get", "runs.logs", "runs.artifact", "runs.cancel", "provider.status", "provider.probe", "task.run", "agents.list", "release.plan", "release.inspect", "release.apply", "release.rollback", "task.rebase", "backup.create":
@@ -176,7 +200,7 @@ func (s *Service) start(ctx context.Context, p Params) (any, error) {
 			m, snapshot, e = s.Workspace.Capture(ctx, p.Ref)
 		}
 		if e == nil {
-			id, path, coverage, e = indexer.Build(ctx, s.Data, s.Workspace.Objects, m, snapshot)
+			id, path, coverage, e = indexer.Build(ctx, s.Data, s.Workspace.Objects, m, snapshot, s.Config.Business)
 		}
 		if e == nil {
 			e = s.Store.Publish(s.Workspace.Project, id, snapshot, path, coverage, epoch, p.Operation)

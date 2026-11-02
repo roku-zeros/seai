@@ -287,6 +287,9 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 		if p.Patch == nil {
 			return nil, domain.Err("SCHEMA_INVALID", "patch required")
 		}
+		if e = s.businessGate(ctx, pin.Path, t.Spec.Scope.Files); e != nil {
+			return nil, e
+		}
 		if e = s.typeGuard(ctx, pin.Path); e != nil {
 			return nil, e
 		}
@@ -473,6 +476,9 @@ func (s *Service) validateEvidence(ctx context.Context, path string, plan domain
 			e = db.QueryRowContext(ctx, "SELECT (SELECT count(*) FROM symbols WHERE evidence=?)+(SELECT count(*) FROM refs WHERE evidence=?)+(SELECT count(*) FROM chunks WHERE evidence=?)+(SELECT count(*) FROM source_files WHERE evidence=?)", id, id, id, id).Scan(&n)
 			if e != nil {
 				return e
+			}
+			if n == 0 {
+				_ = db.QueryRowContext(ctx, "SELECT count(*) FROM business_evidence WHERE evidence=?", id).Scan(&n)
 			}
 			if n == 0 {
 				return domain.Err("EVIDENCE_NOT_FOUND", "plan evidence absent from baseline generation")

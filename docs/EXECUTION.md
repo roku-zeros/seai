@@ -1,4 +1,6 @@
-# SEAI 0.3: проверки, Qwen, релизы и обслуживание
+# SEAI 0.4: проверки, Qwen, релизы и обслуживание
+
+Предметные Go-адаптеры, flow/impact и расширенные бизнес-прогоны — [BUSINESS.md](BUSINESS.md).
 
 Это продолжение этапов 1–3 из [WORKFLOW.md](WORKFLOW.md). API остаётся `seai.api/v1`; runtime получает additive migration 003. Go — 1.26.6. Реальный Qwen endpoint, GigaCode и Docker в этой поставке не проверены; по умолчанию provider и checks не настроены. Синтетические тесты не подтверждают готовность продуктового пилота.
 
@@ -87,7 +89,7 @@ seai --data DATA agents list RUN_ID
 
 Probe проверяет полный function-call roundtrip и точный ответ. Только успешный probe включает provider_ready на текущий сеанс. Он подтверждает протокол endpoint, а не качество модели. `multi_agent_ready`/`pilot_ready` остаются false до проверки реального продукта. HTTP retries ограничены тремя попытками на Chat call; тела ошибок и токены не попадают в сообщения об ошибках. Usage, если endpoint её не прислал, не объявляется измеренной.
 
-Worker DAG фиксирован: rule researcher и impact researcher с отдельными контекстами → test designer и implementer → deterministic patch integrator → registered checks → независимый reviewer. До двух исследователей одновременно; остальные этапы последовательны. Reviewer получает spec/diff/реальные check reports без диалога implementer. Model tools разрешают только SEAI reads, без shell, approval, release или DB access. Typed graph остаётся baseline graph; чтение изменённого кода идёт по candidate snapshot. Structured results, evidence IDs, attempts, leases/heartbeat и bounded context/call budgets сохраняются. Это фиксированный pipeline, не произвольный распределённый scheduler и не автоматическое разбиение больших задач.
+Worker DAG фиксирован: rule researcher и impact researcher с отдельными контекстами → test designer и implementer → deterministic patch integrator → registered checks → независимый reviewer. До двух исследователей одновременно; остальные этапы последовательны. Reviewer получает spec/diff/реальные check reports без диалога implementer. Model tools разрешают только SEAI reads, без shell, approval, release или DB access. До проверки typed graph относится к baseline; чтение изменённого кода идёт по candidate snapshot. В строгом business режиме reviewer использует проверенный candidate generation из domain-analysis и различает baseline/candidate evidence. Structured results, evidence IDs, attempts, leases/heartbeat и bounded context/call budgets сохраняются. Это фиксированный pipeline, не произвольный распределённый scheduler и не автоматическое разбиение больших задач.
 
 Если run остановился после сохранения candidate, возобновите:
 
@@ -144,7 +146,7 @@ Backup создаёт согласованный SQLite VACUUM INTO snapshot и 
 ```json
 {
   "schema_version": "seai.upgrade/v1",
-  "product_version": "0.3.0-dev",
+  "product_version": "0.4.0-dev",
   "api_version": "seai.api/v1",
   "runtime_schema": 3,
   "seai": "/absolute/new/seai",
@@ -161,6 +163,6 @@ seai --data OLD_DATA upgrade prepare \
   --bundle /absolute/bundle.json --output /absolute/NEW_INSTALLATION
 ```
 
-Команда требует эксклюзивную daemon.lock, проверяет hashes/version/API/schema, создаёт согласованный backup, восстанавливает/мигрирует данные в NEW_INSTALLATION/data, копирует бинарники и запускает новый seaid --check-data. Поддержан только bundle текущего `0.3.0-dev` и runtime 2/3; произвольные будущие миграции не обещаются. Бинарники bundle — исполняемый код оператора: checksum устанавливает идентичность, а не доверие. Старые данные/бинарники не заменяются; **автоматической активации нет**. Ошибка удаляет новую подготовленную установку.
+Команда требует эксклюзивную daemon.lock, проверяет hashes/version/API/schema, создаёт согласованный backup, восстанавливает/мигрирует данные в NEW_INSTALLATION/data, копирует бинарники и запускает новый seaid --check-data. Поддержан только bundle текущего `0.4.0-dev` и runtime 2/3; произвольные будущие миграции не обещаются. Бинарники bundle — исполняемый код оператора: checksum устанавливает идентичность, а не доверие. Старые данные/бинарники не заменяются; **автоматической активации нет**. Ошибка удаляет новую подготовленную установку.
 
 После успеха вручную запустите NEW_INSTALLATION/seaid с NEW_INSTALLATION/data, прежними repo/project и вашим config. Обновите пути установки skills/session. До начала новой работы rollback — остановить новый daemon и запустить прежний с OLD_DATA. После новой работы сначала сохраните новый backup: простой возврат к старому runtime потеряет новую историю. Downgrade schema 3 старым бинарником не поддерживается. `seaid --version` печатает manifest, `seaid --data DATA --check-data` offline мигрирует и проверяет SQLite под lock.

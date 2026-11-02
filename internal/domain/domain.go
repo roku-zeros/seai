@@ -112,10 +112,11 @@ type Hit struct {
 	Snippet  string `json:"snippet"`
 }
 type SearchResult struct {
-	Snapshot    string   `json:"source_snapshot_id"`
-	Generation  string   `json:"index_generation_id"`
-	Coverage    string   `json:"coverage"`
-	Hits        []Hit    `json:"hits"`
-	Truncated   bool     `json:"truncated"`
-	Limitations []string `json:"limitations"`
+	BusinessRules []BusinessRule `json:"business_rules,omitempty"`
+	Snapshot      string         `json:"source_snapshot_id"`
+	Generation    string         `json:"index_generation_id"`
+	Coverage      string         `json:"coverage"`
+	Hits          []Hit          `json:"hits"`
+	Truncated     bool           `json:"truncated"`
+	Limitations   []string       `json:"limitations"`
 }

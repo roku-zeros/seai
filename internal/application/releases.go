@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"seai.local/seai/internal/business"
 	"seai.local/seai/internal/domain"
 	"seai.local/seai/internal/indexer"
 	"seai.local/seai/internal/patches"
@@ -41,7 +42,7 @@ func (s *Service) release(ctx context.Context, method string, p Params) (any, er
 			if e != nil {
 				return nil, e
 			}
-			plan := domain.ReleasePlan{ID: uniqueID(), ReleaseID: p.ReleaseID, Ref: p.Ref, Commit: m.Commit, Source: id, FromSource: pin.Snapshot, FromGeneration: pin.Generation, Epoch: pin.Epoch, Extractor: indexer.Version, Paths: reconcile.Paths(old, m), Tasks: []string{}}
+			plan := domain.ReleasePlan{BusinessConfigDigest: business.Digest(s.Config.Business), ID: uniqueID(), ReleaseID: p.ReleaseID, Ref: p.Ref, Commit: m.Commit, Source: id, FromSource: pin.Snapshot, FromGeneration: pin.Generation, Epoch: pin.Epoch, Extractor: indexer.Version, Paths: reconcile.Paths(old, m), Tasks: []string{}}
 			rows, e := s.Store.DB.QueryContext(c, "SELECT id FROM tasks ORDER BY id")
 			if e != nil {
 				return nil, e
@@ -72,7 +73,7 @@ func (s *Service) release(ctx context.Context, method string, p Params) (any, er
 			if e = s.Store.DB.QueryRowContext(c, "SELECT source_id,commit_sha FROM releases WHERE release_id=?", p.ReleaseID).Scan(&source, &commit); e != nil {
 				return nil, e
 			}
-			plan = domain.ReleasePlan{ID: uniqueID(), ReleaseID: p.ReleaseID, Source: source, Commit: commit, Epoch: pin.Epoch, FromGeneration: pin.Generation, Extractor: indexer.Version}
+			plan = domain.ReleasePlan{BusinessConfigDigest: business.Digest(s.Config.Business), ID: uniqueID(), ReleaseID: p.ReleaseID, Source: source, Commit: commit, Epoch: pin.Epoch, FromGeneration: pin.Generation, Extractor: indexer.Version}
 		} else {
 			var d string
 			if e = s.Store.DB.QueryRowContext(c, "SELECT digest FROM release_plans WHERE id=? AND state='PLANNED'", p.ID).Scan(&d); e != nil {
@@ -86,6 +87,9 @@ func (s *Service) release(ctx context.Context, method string, p Params) (any, er
 				return nil, e
 			}
 		}
+		if plan.BusinessConfigDigest != business.Digest(s.Config.Business) {
+			return nil, domain.Err("STALE_RELEASE_PLAN", "business adapters changed; replan release")
+		}
 		if plan.Epoch != pin.Epoch || plan.FromGeneration != pin.Generation || plan.Extractor != indexer.Version {
 			return nil, domain.Err("STALE_RELEASE_PLAN", "replan against current epoch and extractor")
 		}
@@ -93,7 +97,7 @@ func (s *Service) release(ctx context.Context, method string, p Params) (any, er
 		if e != nil {
 			return nil, e
 		}
-		generation, path, coverage, e := indexer.Build(c, s.Data, s.Workspace.Objects, m, plan.Source)
+		generation, path, coverage, e := indexer.Build(c, s.Data, s.Workspace.Objects, m, plan.Source, s.Config.Business)
 		if e != nil {
 			return nil, e
 		}
@@ -185,7 +189,7 @@ func (s *Service) rebase(ctx context.Context, run string, p Params) (any, error)
 	if e != nil {
 		return nil, e
 	}
-	if t.Baseline == pin.Snapshot && !t.Reconciliation {
+	if t.Baseline == pin.Snapshot && t.Epoch == pin.Epoch && !t.Reconciliation {
 		return nil, domain.Err("INVALID_STATE", "task already on current release")
 	}
 	base, e := s.manifest(ctx, t.Baseline)

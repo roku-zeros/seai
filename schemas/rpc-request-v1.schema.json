@@ -52,7 +52,13 @@
         "release.rollback",
         "task.rebase",
         "backup.create",
-        "runs.artifact"
+        "runs.artifact",
+        "rules.search",
+        "rules.get",
+        "rules.discover",
+        "rules.diagnostics",
+        "flow.get",
+        "impact.get"
       ]
     },
     "params": {
@@ -158,6 +164,18 @@
         "artifact_digest": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 16
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
         }
       },
       "required": [

@@ -97,3 +97,37 @@ func TestTestEvidenceRequiresActualRun(t *testing.T) {
 		t.Fatal("unapproved execution accepted")
 	}
 }
+
+func TestBusinessCasesCoverageTraceAndBaseline(t *testing.T) {
+	cas := storage.CAS{Root: t.TempDir()}
+	p := localProfile()
+	p.Fixtures = []domain.Fixture{{ID: "boundary", Input: "", Expected: json.RawMessage(`{"value":21,"trace":["AGE"]}`), BaselineExpected: json.RawMessage(`{"value":18,"trace":["AGE"]}`), Criteria: []string{"AC1"}, AllowedPaths: []string{"/value"}, RuleKeys: []string{"AGE"}, Category: "boundary", Context: map[string]string{"Product": "retail"}}}
+	p.RuleTracePath = "/trace"
+	p.RequiredCases = []domain.CaseRequirement{{RuleKey: "AGE", Context: map[string]string{"Product": "retail"}, Categories: []string{"boundary"}}}
+	spec := domain.ChangeSpec{Kind: "change", Criteria: []domain.Criterion{{ID: "AC1", Profile: p.AssertionProfile, FixtureDigest: FixtureDigest(p)}}}
+	base := scriptManifest(t, cas, "printf '%s' '{\"value\":18,\"trace\":[\"AGE\"]}'\n")
+	candidate := scriptManifest(t, cas, "printf '%s' '{\"value\":21,\"trace\":[\"AGE\"]}'\n")
+	r := Run(context.Background(), p, base, candidate, spec, cas, t.TempDir())
+	if r.Status != "PASSED" || len(r.BusinessCoverage) != 1 || len(r.BusinessCoverage[0].Missing) != 0 || !r.BusinessCases[0].TraceVerified {
+		t.Fatalf("%+v", r)
+	}
+	previous := FixtureDigest(p)
+	p.RequiredCases[0].Categories = append(p.RequiredCases[0].Categories, "exception")
+	if Validate(p) == nil {
+		t.Fatal("missing exception silently covered")
+	}
+	if FixtureDigest(p) == previous {
+		t.Fatal("coverage semantics not bound to approval")
+	}
+	p.RequiredCases[0].Categories = []string{"boundary"}
+	incorrect := scriptManifest(t, cas, "printf '%s' '{\"value\":19,\"trace\":[\"AGE\"]}'\n")
+	r = Run(context.Background(), p, incorrect, candidate, spec, cas, t.TempDir())
+	if r.Status == "PASSED" || r.BusinessCases[0].BaselineMatched == nil || *r.BusinessCases[0].BaselineMatched {
+		t.Fatal("baseline drift accepted", r)
+	}
+	wrongTrace := scriptManifest(t, cas, "printf '%s' '{\"value\":21,\"trace\":[]}'\n")
+	r = Run(context.Background(), p, base, wrongTrace, spec, cas, t.TempDir())
+	if r.Status == "PASSED" || r.BusinessCases[0].TraceVerified || len(r.BusinessCoverage[0].Missing) == 0 {
+		t.Fatal("unexecuted rule counted as covered", r)
+	}
+}

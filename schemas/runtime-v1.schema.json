@@ -99,7 +99,32 @@
                   "items": {
                     "type": "string"
                   }
-                }
+                },
+                "rule_keys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "category": {
+                  "enum": [
+                    "normal",
+                    "boundary",
+                    "exception",
+                    "combination",
+                    "regression"
+                  ]
+                },
+                "description": {
+                  "type": "string"
+                },
+                "context": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "expected_baseline": {}
               },
               "required": [
                 "id",
@@ -107,6 +132,46 @@
                 "expected",
                 "criterion_ids",
                 "allowed_paths"
+              ]
+            }
+          },
+          "rule_trace_path": {
+            "type": "string"
+          },
+          "required_cases": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "rule_key": {
+                  "type": "string"
+                },
+                "context": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "normal",
+                      "boundary",
+                      "exception",
+                      "combination",
+                      "regression"
+                    ]
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "rule_key",
+                "categories"
               ]
             }
           }
@@ -186,6 +251,9 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 7200
+    },
+    "business": {
+      "$ref": "business-config-v1.schema.json"
     }
   },
   "required": [

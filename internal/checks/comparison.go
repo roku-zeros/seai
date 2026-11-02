@@ -98,10 +98,28 @@ func Differences(a, b any) []domain.Difference {
 }
 func compare(ctx context.Context, p domain.CheckProfile, base, candidate domain.Manifest, spec domain.ChangeSpec, cas storage.CAS, parent string) (r domain.CheckResult) {
 	r = domain.CheckResult{ProfileID: p.ID, Status: "PASSED", ExitCode: 0, Tests: []string{}, Criteria: []string{}, Differences: []domain.Difference{}, FixtureDigest: FixtureDigest(p), Isolation: p.Isolation}
+	r.BusinessCases = []domain.BusinessCaseResult{}
 	logs := []map[string]any{}
-	defer func() { encoded, _ := json.Marshal(logs); r.StdoutDigest, _ = cas.Put(encoded) }()
+	defer func() {
+		encoded, _ := json.Marshal(logs)
+		r.StdoutDigest, _ = cas.Put(encoded)
+		for i := range r.BusinessCases {
+			if r.BusinessCases[i].Status == "RUNNING" {
+				r.BusinessCases[i].Status = r.Status
+			}
+		}
+		for i := len(r.BusinessCases); i < len(p.Fixtures); i++ {
+			f := p.Fixtures[i]
+			r.BusinessCases = append(r.BusinessCases, domain.BusinessCaseResult{Fixture: f.ID, Category: f.Category, RuleKeys: f.RuleKeys, Context: f.Context, Description: f.Description, Status: "NOT_RUN", Differences: []domain.Difference{}})
+		}
+		r.BusinessCoverage = businessCoverage(p, r.BusinessCases)
+	}()
 	coverage := map[string]bool{}
 	for _, fixture := range p.Fixtures {
+		caseResult := domain.BusinessCaseResult{Fixture: fixture.ID, RuleKeys: fixture.RuleKeys, Category: fixture.Category, Context: fixture.Context, Description: fixture.Description, Status: "RUNNING", Differences: []domain.Difference{}}
+		caseIndex := len(r.BusinessCases)
+		r.BusinessCases = append(r.BusinessCases, caseResult)
+		startDifferences := len(r.Differences)
 		values := []any{}
 		for _, m := range []domain.Manifest{base, base, candidate, candidate} {
 			pr := Execute(ctx, p, m, cas, parent, fixture.Input)
@@ -138,6 +156,38 @@ func compare(ctx context.Context, p domain.CheckProfile, base, candidate domain.
 			r.Error = e.Error()
 			return r
 		}
+		caseResult.Status = "PASSED"
+		caseResult.CandidateMatched = len(Differences(expected, values[2])) == 0
+		if len(fixture.BaselineExpected) > 0 {
+			baseline, _ := ParseJSON(fixture.BaselineExpected)
+			matched := len(Differences(baseline, values[0])) == 0
+			caseResult.BaselineMatched = &matched
+			if !matched {
+				caseResult.Status = "FAILED"
+				r.Status = "FAILED"
+				delta := Differences(baseline, values[0])
+				for i := range delta {
+					delta[i].Fixture = fixture.ID
+					delta[i].Classification = "baseline_expectation_failed"
+				}
+				r.Differences = append(r.Differences, delta...)
+			}
+		}
+		if p.RuleTracePath != "" {
+			observed, err := traceRules(values[2], p.RuleTracePath)
+			caseResult.ObservedRules = observed
+			caseResult.TraceVerified = err == nil
+			for _, key := range fixture.RuleKeys {
+				if !includes(observed, key) {
+					caseResult.TraceVerified = false
+				}
+			}
+			if !caseResult.TraceVerified {
+				caseResult.Status = "FAILED"
+				r.Status = "FAILED"
+				r.Error = "business rule trace missing or does not confirm required rule IDs"
+			}
+		}
 		if diff := Differences(expected, values[2]); len(diff) > 0 {
 			for i := range diff {
 				diff[i].Fixture = fixture.ID
@@ -165,6 +215,16 @@ func compare(ctx context.Context, p domain.CheckProfile, base, candidate domain.
 			}
 			r.Differences = append(r.Differences, delta[i])
 		}
+		caseResult.Differences = append(caseResult.Differences, r.Differences[startDifferences:]...)
+		if !caseResult.CandidateMatched {
+			caseResult.Status = "FAILED"
+		}
+		for _, d := range caseResult.Differences {
+			if d.Classification != "expected" {
+				caseResult.Status = "FAILED"
+			}
+		}
+		r.BusinessCases[caseIndex] = caseResult
 		for _, id := range fixture.Criteria {
 			for _, c := range spec.Criteria {
 				if c.ID == id && c.Profile == p.AssertionProfile && c.FixtureDigest == r.FixtureDigest {

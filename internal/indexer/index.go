@@ -4,6 +4,7 @@ package indexer
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -14,17 +15,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"seai.local/seai/internal/business"
 	"seai.local/seai/internal/domain"
 	"seai.local/seai/internal/storage"
 	"seai.local/seai/internal/workspace"
 	"strings"
 )
 
-const Version = "structural-v3"
+const Version = "structural-v4"
 const MinimumGoVersion = "go1.26.6"
 const schema = `CREATE TABLE symbols(id TEXT PRIMARY KEY,name TEXT NOT NULL,package TEXT NOT NULL,kind TEXT NOT NULL,path TEXT NOT NULL,start INTEGER NOT NULL,end INTEGER NOT NULL,evidence TEXT NOT NULL,blob TEXT NOT NULL); CREATE INDEX symbol_names ON symbols(name,package); CREATE TABLE diagnostics(message TEXT NOT NULL); CREATE TABLE refs(id TEXT PRIMARY KEY,target TEXT NOT NULL,caller TEXT NOT NULL,name TEXT NOT NULL,path TEXT NOT NULL,start INTEGER NOT NULL,end INTEGER NOT NULL,kind TEXT NOT NULL,certainty TEXT NOT NULL,evidence TEXT NOT NULL); CREATE INDEX ref_targets ON refs(target,kind,path,start); CREATE INDEX ref_callers ON refs(caller,kind); CREATE TABLE chunks(id INTEGER PRIMARY KEY,path TEXT NOT NULL,blob TEXT NOT NULL,start INTEGER NOT NULL,text TEXT NOT NULL,evidence TEXT NOT NULL); CREATE INDEX chunk_evidence ON chunks(evidence); CREATE TABLE source_files(path TEXT PRIMARY KEY,blob TEXT NOT NULL,mode TEXT NOT NULL,evidence TEXT NOT NULL); CREATE INDEX source_evidence ON source_files(evidence); CREATE TABLE analysis_meta(type_errors INTEGER NOT NULL);`
 
-var Limitations = []string{"domain extractors are not configured", "calls cover named functions and static typed targets; dynamic calls are possible/unresolved; text search is literal per-line, not FTS5", "external modules, cgo and multi-module workspaces are not indexed", "unsaved editor buffers are excluded", "policy excludes vendor/**, .seai/**, .env and *.key"}
+var Limitations = []string{"business coverage depends on configured typed adapters; source registration never proves runtime execution", "calls cover named functions and static typed targets; dynamic calls are possible/unresolved; text search is literal per-line, not FTS5", "external modules, cgo and multi-module workspaces are not indexed", "unsaved editor buffers are excluded", "policy excludes vendor/**, .seai/**, .env and *.key"}
 
 func Environment() []string {
 	env := []string{"GOPROXY=off", "GOSUMDB=off", "GOTOOLCHAIN=local", "GOFLAGS=-mod=readonly", "GOWORK=off", "CGO_ENABLED=0", "GOPACKAGESDRIVER=off"}
@@ -51,14 +53,21 @@ func BuildProfile(ctx context.Context) (domain.Build, error) {
 	}
 	return domain.Build{Toolchain: v[0], GOOS: v[1], GOARCH: v[2], Tags: []string{}, Profile: "offline-cgo-disabled-v1"}, nil
 }
-func Build(ctx context.Context, root string, cas storage.CAS, m domain.Manifest, snapshot string) (id, path, coverage string, err error) {
+func Build(ctx context.Context, root string, cas storage.CAS, m domain.Manifest, snapshot string, configs ...*domain.BusinessConfig) (id, path, coverage string, err error) {
+	var config *domain.BusinessConfig
+	if len(configs) > 0 {
+		config = configs[0]
+	}
+	if e := business.Validate(config); e != nil {
+		return "", "", "", e
+	}
 	// Reuse still verifies every source object referenced by the manifest.
 	for _, f := range m.Files {
 		if _, e := cas.Get(f.Digest); e != nil {
 			return "", "", "", e
 		}
 	}
-	identity, _ := domain.Canonical(map[string]string{"snapshot": snapshot, "extractor": Version})
+	identity, _ := domain.Canonical(map[string]string{"snapshot": snapshot, "extractor": Version, "business": business.Version, "business_config": business.Digest(config)})
 	id = domain.Digest(identity)
 	dir := filepath.Join(root, "indexes", id)
 	path = filepath.Join(dir, "index.db")
@@ -121,7 +130,7 @@ func Build(ctx context.Context, root string, cas storage.CAS, m domain.Manifest,
 		return "", "", "", e
 	}
 	defer db.Close()
-	if _, e = db.Exec(schema); e != nil {
+	if _, e = db.Exec(schema + `; CREATE TABLE business_index(id INTEGER PRIMARY KEY CHECK(id=1),payload BLOB NOT NULL);CREATE TABLE business_evidence(evidence TEXT PRIMARY KEY,path TEXT NOT NULL,start INTEGER NOT NULL,end INTEGER NOT NULL);`); e != nil {
 		return "", "", "", e
 	}
 	tx, e := db.Begin()
@@ -215,6 +224,42 @@ func Build(ctx context.Context, root string, cas storage.CAS, m domain.Manifest,
 	}
 	if e = buildDetails(ctx, tx, pkgs, source, m, cas, definitions); e != nil {
 		return "", "", "", e
+	}
+	graph, err := business.Extract(pkgs, source, m, cas, definitions, config)
+	if err != nil {
+		return "", "", "", err
+	}
+	if typeErrors > 0 {
+		graph.Diagnostics = append(graph.Diagnostics, domain.BusinessDiagnostic{Code: "TYPE_COVERAGE_GAP", Message: fmt.Sprintf("%d Go package/type errors; business graph may be incomplete", typeErrors), Blocking: true})
+	}
+	graphJSON, err := json.Marshal(graph)
+	if err != nil {
+		return "", "", "", err
+	}
+	if _, e = tx.Exec("INSERT INTO business_index VALUES(1,?)", graphJSON); e != nil {
+		return "", "", "", e
+	}
+	addEvidence := func(ev domain.BusinessEvidence) error {
+		if ev.ID == "" {
+			return nil
+		}
+		_, err := tx.Exec("INSERT OR IGNORE INTO business_evidence VALUES(?,?,?,?)", ev.ID, ev.Path, ev.Start, ev.End)
+		return err
+	}
+	for _, rule := range graph.Rules {
+		if err = addEvidence(rule.Evidence); err != nil {
+			return "", "", "", err
+		}
+		for _, h := range rule.Handlers {
+			if err = addEvidence(h.Evidence); err != nil {
+				return "", "", "", err
+			}
+		}
+	}
+	for _, fact := range graph.Facts {
+		if err = addEvidence(fact.Evidence); err != nil {
+			return "", "", "", err
+		}
 	}
 	if _, e = tx.Exec("INSERT INTO analysis_meta VALUES(?)", typeErrors); e != nil {
 		return "", "", "", e

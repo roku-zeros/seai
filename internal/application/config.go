@@ -3,6 +3,7 @@ package application
 import (
 	"encoding/json"
 	"os"
+	"seai.local/seai/internal/business"
 	"seai.local/seai/internal/checks"
 	"seai.local/seai/internal/contracts"
 	"seai.local/seai/internal/domain"
@@ -26,8 +27,14 @@ func (s *Service) Configure(path string) error {
 	if c.Schema != "seai.runtime/v1" || c.MaxWorkers < 1 || c.MaxWorkers > 2 || c.MaxNodeAttempts < 1 || c.MaxNodeAttempts > 2 || c.MaxRunSeconds < 1 || c.MaxRunSeconds > 7200 {
 		return domain.Err("SCHEMA_INVALID", "runtime configuration bounds invalid")
 	}
+	if e := business.Validate(c.Business); e != nil {
+		return e
+	}
 	profiles := map[string]domain.CheckProfile{}
 	for _, p := range c.Checks {
+		if p.ID == "domain-analysis" {
+			return domain.Err("SCHEMA_INVALID", "domain-analysis is reserved for candidate business verification")
+		}
 		if e := checks.Validate(p); e != nil {
 			return e
 		}

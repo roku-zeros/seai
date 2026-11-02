@@ -17,7 +17,7 @@ import (
 	"syscall"
 )
 
-const Version = "0.3.0-dev"
+const Version = "0.4.0-dev"
 
 func Lock(data string) (*os.File, error) {
 	info, e := os.Lstat(data)

@@ -4,7 +4,7 @@
 
 При установленном наборе SEAI-only skills постоянная политика `.gigacode/seai/POLICY.md` ограничивает доступ к коду. Установка/сборка самого SEAI — отдельный административный этап до подключения целевого проекта. Настройка skills описана в [GIGACODE_SKILLS.md](GIGACODE_SKILLS.md). Если GigaCode запущен в общей родительской папке проекта и SEAI, установи правило/skills туда через --workspace; наличие GIGACODE.md только внутри дочерней папки не подтверждает его загрузку текущей сессией. `/seai:setup` теперь подключается к установленному инструменту; для первоначальной установки используй прямое прикрепление этого runbook.
 
-Текущая поставка — `0.3.0-dev`, Go 1.26.6. SEAI обеспечивает snapshot/read/search/refs/calls, контракт задачи и изолированный candidate/patch/diff; объяснения и подготовку предложений выполняет GigaCode. Нет встроенного чата и MCP-сервера. Qwen workers, product check runner и release rebase настраиваются по [EXECUTION.md](EXECUTION.md); Qwen по решению пользователя пока не настроен. Средние/большие задачи допускаются как исследование с явными ограничениями, не как автономный change workflow.
+Текущая поставка — `0.4.0-dev`, Go 1.26.6. SEAI обеспечивает snapshot/read/search/refs/calls, контракт задачи и изолированный candidate/patch/diff; объяснения и подготовку предложений выполняет GigaCode. Нет встроенного чата и MCP-сервера. Qwen workers, product check runner и release rebase настраиваются по [EXECUTION.md](EXECUTION.md); Qwen по решению пользователя пока не настроен. Средние/большие задачи допускаются как исследование с явными ограничениями, не как автономный change workflow.
 
 ## 1. Проверить окружение и найти проект
 
@@ -157,7 +157,7 @@ printf '%s\n' "$!" > "$SEAI_SESSION/daemon.pid"
 
 Критерии успеха: doctor доступен; `project status` указывает на demo root; index job имеет `data.state=SUCCEEDED`; search содержит нужные hits, source_snapshot_id/index_generation_id и исходные snippets. `pilot_ready=false`, `coverage=partial` и search `status=partial` ожидаемы, но diagnostics ошибок типизации нельзя игнорировать. Сохрани идентификаторы снимка/поколения и абсолютные пути для следующего вопроса.
 
-Глобальные `--data`/`--json` идут **до** команды. Полный список новых read/graph/task/patch команд — в [WORKFLOW.md](WORKFLOW.md). Новые task run/verify, checks, release и maintenance команды описаны в EXECUTION.md. Отдельные flow/impact CLI пока отсутствуют.
+Глобальные `--data`/`--json` идут **до** команды. Полный список новых read/graph/task/patch команд — в [WORKFLOW.md](WORKFLOW.md). Новые task run/verify, checks, release и maintenance команды описаны в EXECUTION.md. Go business rules, flow/impact и бизнес-проверки описаны в BUSINESS.md.
 
 ## 5. Отвечать на вопросы
 

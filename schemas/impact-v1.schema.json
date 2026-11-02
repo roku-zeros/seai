@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seai.local/schemas/impact-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "source_snapshot_id": {
+      "type": "string"
+    },
+    "index_generation_id": {
+      "type": "string"
+    },
+    "historical_or_explicit": {
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "seai.impact/v1"
+    },
+    "direction": {
+      "enum": [
+        "forward_calls",
+        "reverse_consumers"
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "confirmed": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "possible": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "unexamined": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "affected_rules": {
+      "type": "array",
+      "items": {
+        "$ref": "business-rule-v1.schema.json"
+      }
+    },
+    "affected_rule_count": {
+      "type": "integer"
+    },
+    "affected_contexts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "affected_packages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "related_tests": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "source_facts": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "coverage_gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "coverage": {
+      "const": "partial"
+    },
+    "limits": {
+      "type": "object"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "suggested_checks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "source_snapshot_id",
+    "index_generation_id",
+    "historical_or_explicit",
+    "schema_version",
+    "direction",
+    "nodes",
+    "confirmed",
+    "possible",
+    "unexamined",
+    "affected_rules",
+    "affected_rule_count",
+    "coverage_gaps",
+    "truncated"
+  ]
+}

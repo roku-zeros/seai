@@ -82,19 +82,22 @@ func Validate(p domain.CheckProfile) error {
 			}
 		}
 	}
-	return nil
+	return validateBusiness(p)
 }
 func ProfileSummaries(profiles map[string]domain.CheckProfile) []map[string]any {
 	out := []map[string]any{}
 	for _, p := range profiles {
 		d, _ := json.Marshal(p)
-		f, _ := json.Marshal(p.Fixtures)
-		out = append(out, map[string]any{"id": p.ID, "kind": p.Kind, "isolation": p.Isolation, "profile_digest": domain.Digest(d), "fixture_digest": domain.Digest(f), "assertion_profile": p.AssertionProfile, "test_names": p.TestNames, "fixtures": p.Fixtures, "limits": map[string]any{"timeout_seconds": p.TimeoutSeconds, "cpus": p.CPUs, "memory_mb": p.MemoryMB}, "local_execution_is_not_sandboxed": p.Isolation == "local-approved"})
+		out = append(out, map[string]any{"id": p.ID, "kind": p.Kind, "isolation": p.Isolation, "profile_digest": domain.Digest(d), "fixture_digest": FixtureDigest(p), "assertion_profile": p.AssertionProfile, "test_names": p.TestNames, "fixtures": p.Fixtures, "required_cases": p.RequiredCases, "rule_trace_path": p.RuleTracePath, "limits": map[string]any{"timeout_seconds": p.TimeoutSeconds, "cpus": p.CPUs, "memory_mb": p.MemoryMB}, "local_execution_is_not_sandboxed": p.Isolation == "local-approved"})
 	}
 	return out
 }
 func FixtureDigest(p domain.CheckProfile) string {
-	b, _ := json.Marshal(p.Fixtures)
+	var v any = p.Fixtures
+	if len(p.RequiredCases) > 0 || p.RuleTracePath != "" {
+		v = map[string]any{"schema_version": "seai.business-fixtures/v1", "fixtures": p.Fixtures, "required_cases": p.RequiredCases, "rule_trace_path": p.RuleTracePath}
+	}
+	b, _ := json.Marshal(v)
 	return domain.Digest(b)
 }
 

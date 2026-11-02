@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"seai.local/seai/internal/business"
 	"seai.local/seai/internal/domain"
 	"seai.local/seai/internal/indexer"
 	"seai.local/seai/internal/workspace"
@@ -143,7 +144,30 @@ func (s *Service) research(ctx context.Context, method string, p Params) (any, e
 			return nil, e
 		}
 		diagnostics, e := indexer.Diagnostics(ctx, pin.Path)
-		return domain.SearchResult{Snapshot: pin.Snapshot, Generation: pin.Generation, Coverage: pin.Coverage, Hits: hits, Truncated: more, Limitations: diagnostics}, e
+		businessRules := []domain.BusinessRule{}
+		if db, err := business.Open(pin.Path); err == nil {
+			if graph, err := business.Load(ctx, db); err == nil {
+				if p.Generation != "" && p.Generation != "current" || graph.ConfigDigest == business.Digest(s.Config.Business) {
+					for _, rule := range graph.Rules {
+						if business.Matches(rule, p.Query, nil) {
+							businessRules = append(businessRules, business.BriefRule(rule))
+						}
+					}
+					if len(businessRules) > limit {
+						businessRules = businessRules[:limit]
+						more = true
+					}
+					if len(hits)+len(businessRules) > limit {
+						hits = hits[:limit-len(businessRules)]
+						more = true
+					}
+				} else {
+					diagnostics = append(diagnostics, "business adapters differ from indexed config; rebuild before domain retrieval")
+				}
+			}
+			db.Close()
+		}
+		return domain.SearchResult{BusinessRules: businessRules, Snapshot: pin.Snapshot, Generation: pin.Generation, Coverage: pin.Coverage, Hits: hits, Truncated: more, Limitations: diagnostics}, e
 	case "files.list", "file.read":
 		m, e := s.manifest(ctx, snapshot)
 		if e != nil {
