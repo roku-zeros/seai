@@ -17,7 +17,7 @@ import (
 	"syscall"
 )
 
-const Version = "0.4.0-dev"
+const Version = "0.4.1-dev"
 
 func Lock(data string) (*os.File, error) {
 	info, e := os.Lstat(data)
@@ -347,7 +347,7 @@ func CheckFiles(ctx context.Context, data string, db *sql.DB) error {
 			return domain.Err("STORAGE_CORRUPT", "snapshot manifest differs")
 		}
 		for _, f := range m.Files {
-			if !workspace.ValidSourcePath(f.Path) {
+			if !workspace.ValidStoredSourcePath(f.Path) {
 				return domain.Err("STORAGE_CORRUPT", "invalid source path")
 			}
 			if _, e = cas.Get(f.Digest); e != nil {

@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"seai.local/seai/internal/application"
 	"seai.local/seai/internal/contracts"
 	"seai.local/seai/internal/domain"
@@ -95,6 +96,15 @@ func HumanDecision(ctx context.Context, socket, method string, p application.Par
 func HumanApproval(ctx context.Context, socket string, p application.Params) (Envelope, error) {
 	return callRoute(ctx, socket, "/human/approve", "human.approve", p)
 }
+
+const DefaultRPCTimeout = 2 * time.Minute
+
+type timeoutKey struct{}
+
+// WithTimeout sets a per-RPC timeout; index/job polling retains a fresh budget per call.
+func WithTimeout(ctx context.Context, d time.Duration) context.Context {
+	return context.WithValue(ctx, timeoutKey{}, d)
+}
 func callRoute(ctx context.Context, socket, route, method string, p application.Params) (Envelope, error) {
 	p.Schema = domain.API
 	b, e := json.Marshal(Request{JSONRPC: "2.0", ID: "cli", Method: method, Params: p})
@@ -105,14 +115,28 @@ func callRoute(ctx context.Context, socket, route, method string, p application.
 		return (&net.Dialer{Timeout: 5 * time.Second}).DialContext(ctx, "unix", socket)
 	}}
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: 35 * time.Second}
+	timeout := DefaultRPCTimeout
+	if d, ok := ctx.Value(timeoutKey{}).(time.Duration); ok && d > 0 {
+		timeout = d
+	}
+	client := &http.Client{Transport: transport, Timeout: timeout}
 	req, e := http.NewRequestWithContext(ctx, "POST", "http://localhost"+route, bytes.NewReader(b))
 	if e != nil {
 		return Envelope{}, e
 	}
 	resp, e := client.Do(req)
 	if e != nil {
-		return Envelope{}, fmt.Errorf("daemon unavailable at %s: %w; start seaid explicitly", socket, e)
+		if errors.Is(e, context.Canceled) {
+			return Envelope{}, fmt.Errorf("RPC %s cancelled: %w", method, e)
+		}
+		var networkError net.Error
+		if errors.Is(e, context.DeadlineExceeded) || (errors.As(e, &networkError) && networkError.Timeout()) {
+			return Envelope{}, fmt.Errorf("RPC %s timed out at %s: %w; daemon may still be running. Check project status; for live verification use workspace check and poll run status. Do not restart or kill seaid based on this timeout", method, socket, e)
+		}
+		if errors.Is(e, os.ErrNotExist) {
+			return Envelope{}, fmt.Errorf("daemon socket is missing at %s: %w; start seaid explicitly", socket, e)
+		}
+		return Envelope{}, fmt.Errorf("RPC %s connection failed at %s: %w; check daemon health and socket", method, socket, e)
 	}
 	defer resp.Body.Close()
 	var result Response

@@ -9,9 +9,11 @@ import shutil
 import subprocess
 import tempfile
 import time
+from smoke_support import wait_for_run
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--bin", required=True, type=Path)
+parser.add_argument("--run-timeout",type=float,default=None,help="async wait budget; default runtime max_run_seconds + 30s")
 args = parser.parse_args()
 binaries = args.bin.resolve()
 source = Path(__file__).resolve().parents[1]
@@ -116,14 +118,8 @@ with tempfile.TemporaryDirectory(prefix="seai-smoke-") as tmp:
         assert cli("read", "rule.go", "--limit", "65536")["data"]["text"] == original_text
         assert cli("task", "diff", task["task_id"])["data"]["patch"]
         def wait_run(accepted):
-            rid = accepted["data"]["run_id"]
-            for _ in range(600):
-                state = cli("run", "status", rid)["data"]
-                if state["state"] not in ["QUEUED", "RUNNING"]:
-                    assert state["state"] == "SUCCEEDED", state
-                    return state
-                time.sleep(0.1)
-            raise RuntimeError("run timeout")
+            budget = args.run_timeout if args.run_timeout is not None else json.loads(config.read_text())["max_run_seconds"] + 30
+            return wait_for_run(lambda rid: cli("run", "status", rid)["data"], accepted["data"]["run_id"], budget)
         check_run = wait_run(cli("task", "verify", task["task_id"]))
         assert cli("task", "status", task["task_id"])["data"]["check_summary"]["checks_passed"] is True
         assert "stdout" in cli("run", "logs", check_run["run_id"], "--profile", "tests")["data"]
@@ -153,7 +149,7 @@ with tempfile.TemporaryDirectory(prefix="seai-smoke-") as tmp:
         run([binaries / "seai", "--data", restored, "backup", "restore", "--from", backup])
         run([binaries / "seaid", "--data", restored, "--check-data"])
         bundle = root / "bundle.json"
-        bundle.write_text(json.dumps(dict(schema_version="seai.upgrade/v1", product_version="0.4.0-dev",
+        bundle.write_text(json.dumps(dict(schema_version="seai.upgrade/v1", product_version="0.4.1-dev",
             api_version="seai.api/v1", runtime_schema=3,
             seai=str(binaries / "seai"), seai_digest=hashlib.sha256((binaries / "seai").read_bytes()).hexdigest(),
             seaid=str(binaries / "seaid"), seaid_digest=hashlib.sha256((binaries / "seaid").read_bytes()).hexdigest())))

@@ -19,18 +19,24 @@ func main() { os.Exit(run()) }
 func run() int {
 	f := flag.NewFlagSet("seai", flag.ContinueOnError)
 	data := f.String("data", "", "daemon runtime directory")
+	timeout := f.Duration("timeout", transports.DefaultRPCTimeout, "per-RPC timeout, e.g. 30s or 2m (not the duration of an async job)")
 	asJSON := f.Bool("json", false, "JSON output (also default)")
 	_ = asJSON
 	if e := f.Parse(os.Args[1:]); e != nil {
 		return 2
 	}
+	if *timeout <= 0 || *timeout > 30*time.Minute {
+		fmt.Fprintln(os.Stderr, "--timeout must be >0 and <=30m")
+		return 2
+	}
 	args := f.Args()
 	if *data == "" || len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: seai --data <runtime> [--json] doctor|project status|workspace status|index build|job status ID|search QUERY|files|read PATH|symbol ID|references ID|calls ID|tests related ID|task ...|patch apply ... (docs/WORKFLOW.md)")
+		fmt.Fprintln(os.Stderr, "usage: seai --data <runtime> [--json] [--timeout 2m] doctor|project status|workspace status/check|index build|job status ID|search QUERY|files|read PATH|symbol ID|references ID|calls ID|tests related ID|task ...|patch apply ... (docs/WORKFLOW.md)")
 		return 2
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
+	ctx = transports.WithTimeout(ctx, *timeout)
 	if len(args) >= 2 && ((args[0] == "backup" && args[1] == "restore") || args[0] == "upgrade") {
 		return offline(ctx, *data, args)
 	}
@@ -225,7 +231,7 @@ func printEnvelope(env transports.Envelope) int {
 	switch env.Error.Code {
 	case "SCHEMA_INVALID", "INVALID_REF", "INVALID_PATH":
 		return 2
-	case "REVISION_CONFLICT", "IDEMPOTENCY_CONFLICT", "WORKFLOW_BUSY", "NOT_READY", "STALE_WORKSPACE", "STALE_TASK", "PRECONDITION_FAILED", "APPROVAL_REQUIRED", "NOT_REVIEW_READY", "SPEC_NOT_READY", "INVALID_STATE", "TYPE_COVERAGE_GAP", "AMBIGUOUS_RULE", "AMBIGUOUS_SYMBOL", "STALE_DOMAIN_CONFIG", "DOMAIN_COVERAGE_GAP", "BUSINESS_CASE_MISSING", "INDEX_UPGRADE_REQUIRED":
+	case "REVISION_CONFLICT", "IDEMPOTENCY_CONFLICT", "WORKFLOW_BUSY", "NOT_READY", "STALE_WORKSPACE", "STALE_TASK", "PRECONDITION_FAILED", "APPROVAL_REQUIRED", "NOT_REVIEW_READY", "SPEC_NOT_READY", "INVALID_STATE", "TYPE_COVERAGE_GAP", "AMBIGUOUS_RULE", "AMBIGUOUS_SYMBOL", "STALE_DOMAIN_CONFIG", "DOMAIN_COVERAGE_GAP", "BUSINESS_CASE_MISSING", "INDEX_UPGRADE_REQUIRED", "FRESHNESS_TIMEOUT":
 		return 3
 	}
 	return 4

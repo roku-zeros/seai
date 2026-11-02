@@ -4,7 +4,7 @@
 
 При установленном наборе SEAI-only skills постоянная политика `.gigacode/seai/POLICY.md` ограничивает доступ к коду. Установка/сборка самого SEAI — отдельный административный этап до подключения целевого проекта. Настройка skills описана в [GIGACODE_SKILLS.md](GIGACODE_SKILLS.md). Если GigaCode запущен в общей родительской папке проекта и SEAI, установи правило/skills туда через --workspace; наличие GIGACODE.md только внутри дочерней папки не подтверждает его загрузку текущей сессией. `/seai:setup` теперь подключается к установленному инструменту; для первоначальной установки используй прямое прикрепление этого runbook.
 
-Текущая поставка — `0.4.0-dev`, Go 1.26.6. SEAI обеспечивает snapshot/read/search/refs/calls, контракт задачи и изолированный candidate/patch/diff; объяснения и подготовку предложений выполняет GigaCode. Нет встроенного чата и MCP-сервера. Qwen workers, product check runner и release rebase настраиваются по [EXECUTION.md](EXECUTION.md); Qwen по решению пользователя пока не настроен. Средние/большие задачи допускаются как исследование с явными ограничениями, не как автономный change workflow.
+Текущая поставка — `0.4.1-dev`, Go 1.26.6. SEAI обеспечивает snapshot/read/search/refs/calls, контракт задачи и изолированный candidate/patch/diff; объяснения и подготовку предложений выполняет GigaCode. Нет встроенного чата и MCP-сервера. Qwen workers, product check runner и release rebase настраиваются по [EXECUTION.md](EXECUTION.md); Qwen по решению пользователя пока не настроен. Средние/большие задачи допускаются как исследование с явными ограничениями, не как автономный change workflow.
 
 ## 1. Проверить окружение и найти проект
 
@@ -205,3 +205,7 @@ Demo не удаляй, пока пользователь продолжает �
 ```
 
 В репозитории также есть prompt shortcuts `.gigacode/commands/seai/setup.md` и `ask.md`: `/seai:setup` и `/seai:ask`. Это Markdown-промпты для подключения/research в режиме SEAI-only, не native SEAI tools. Skills перечислены в GIGACODE_SKILLS.md. Их формат взят из [официальной документации GigaCode CLI](https://gitverse.ru/docs/ai/ai-assistant-gigacode/gigacode-cli/commands); конкретная установленная версия клиента ещё не проверена. Если shortcuts не обнаруживаются, используй прямое прикрепление файла выше. MCP здесь не настраивается.
+
+## Большие репозитории
+
+После index build сохраняйте оба ID и передавайте --generation/--snapshot для исследования выбранной версии. При FRESHNESS_TIMEOUT используйте workspace check и run status; таймаут RPC не доказывает, что daemon остановлен. Не удаляйте agent symlinks ради захвата: их исключает source-policy/v2. [Диагностика и обновление](TROUBLESHOOTING.md).

@@ -48,7 +48,8 @@
     "freshness": {
       "enum": [
         "CURRENT",
-        "STALE"
+        "STALE",
+        "UNKNOWN"
       ]
     },
     "release_readiness": {
@@ -129,6 +130,12 @@
     },
     "warning": {
       "type": "string"
+    },
+    "freshness_error": {
+      "type": [
+        "object",
+        "null"
+      ]
     }
   },
   "required": [

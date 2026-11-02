@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"seai.local/seai/internal/business"
@@ -33,14 +34,55 @@ func (s *Service) resolve(ctx context.Context, generation string) (pinned, error
 	}
 	return p, e
 }
-func (s *Service) live(ctx context.Context) (domain.Manifest, string, error) {
+
+const DefaultFreshnessBudget = 15 * time.Second
+
+func (s *Service) observe(ctx context.Context) (domain.Manifest, string, error) {
 	profile, e := indexer.BuildProfile(ctx)
 	if e != nil {
 		return domain.Manifest{}, "", e
 	}
 	ws := s.Workspace
 	ws.Build = profile
-	return ws.Capture(ctx, "")
+	return ws.Observe(ctx)
+}
+func (s *Service) live(ctx context.Context) (domain.Manifest, string, error) {
+	budget := s.FreshnessBudget
+	if budget <= 0 {
+		budget = DefaultFreshnessBudget
+	}
+	check, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	m, id, e := s.observe(check)
+	if e != nil && check.Err() != nil && ctx.Err() == nil {
+		return domain.Manifest{}, "", &domain.Error{Code: "FRESHNESS_TIMEOUT", Message: fmt.Sprintf("live verification exceeded %s; freshness is unknown, daemon may still be healthy", budget), Retryable: true, SuggestedAction: "Run workspace check (async), or read immutable --generation/--snapshot. Do not retry live scans in a loop or kill seaid."}
+	}
+	return m, id, e
+}
+func (s *Service) workspaceCheck(ctx context.Context, p Params) (any, error) {
+	return s.startRun(ctx, "workspace.check", p, func(c context.Context, _ string, _ domain.Task) (any, error) {
+		pin, e := s.resolve(c, "")
+		if e != nil {
+			return nil, e
+		}
+		_, id, e := s.observe(c)
+		if e != nil {
+			return nil, e
+		}
+		fresh := "CURRENT"
+		if id != pin.Snapshot {
+			fresh = "STALE"
+		}
+		var generation string
+		var epoch int
+		if e = s.Store.DB.QueryRowContext(c, "SELECT current_generation_id,epoch FROM projects").Scan(&generation, &epoch); e != nil {
+			return nil, e
+		}
+		if generation != pin.Generation || epoch != pin.Epoch {
+			return nil, domain.Err("REVISION_CONFLICT", "project changed during workspace check")
+		}
+		return map[string]any{"freshness": fresh, "active_snapshot_id": pin.Snapshot, "observed_snapshot_id": id, "index_generation_id": pin.Generation, "epoch": pin.Epoch, "read_only": true}, nil
+	})
 }
 func (s *Service) guard(ctx context.Context, p pinned) error {
 	_, live, e := s.live(ctx)
@@ -104,7 +146,7 @@ func (s *Service) research(ctx context.Context, method string, p Params) (any, e
 		if id != pin.Snapshot {
 			fresh = "STALE"
 		}
-		return map[string]any{"active_snapshot_id": pin.Snapshot, "observed_snapshot_id": id, "index_generation_id": pin.Generation, "epoch": pin.Epoch, "freshness": fresh}, nil
+		return map[string]any{"active_snapshot_id": pin.Snapshot, "observed_snapshot_id": id, "index_generation_id": pin.Generation, "epoch": pin.Epoch, "freshness": fresh, "source_policy": workspace.SourcePolicy, "excluded_metadata": workspace.MetadataExclusions()}, nil
 	}
 	explicitSnapshot := p.Snapshot != ""
 	if explicitSnapshot && p.Generation != "" && p.Generation != "current" && p.Snapshot != pin.Snapshot {

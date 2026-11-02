@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -96,7 +97,16 @@ func (s *Service) workflow(ctx context.Context, method string, p Params) (any, e
 		if t.Epoch != pin.Epoch || t.Baseline != pin.Snapshot {
 			t.Freshness = "STALE"
 		} else if e = s.guard(ctx, pin); e != nil {
-			t.Freshness = "STALE"
+			var de *domain.Error
+			if errors.As(e, &de) && de.Code == "STALE_WORKSPACE" {
+				t.Freshness = "STALE"
+			} else {
+				t.Freshness = "UNKNOWN"
+				if !errors.As(e, &de) {
+					de = &domain.Error{Code: "FRESHNESS_UNAVAILABLE", Message: e.Error(), SuggestedAction: "Run workspace check; use explicit generation/snapshot for historical reads"}
+				}
+				t.FreshnessError = de
+			}
 		}
 		t.CheckSummary = s.checkSummary(ctx, t)
 		if t.Freshness == "CURRENT" && t.CheckSummary["review_passed"] == true && t.RequirementsFreshness != "not_checked" && t.State != "CANCELLED" {
@@ -462,7 +472,7 @@ func (s *Service) diff(ctx context.Context, t domain.Task) (map[string]any, erro
 	if t.Plan != nil {
 		required = t.Plan.Checks
 	}
-	return map[string]any{"required_checks": required, "plan_digest": t.PlanDigest, "acceptance_criteria": t.Spec.Criteria, "approval_required": t.Kind == "change", "behavior_approved": t.Approved, "task_id": t.ID, "revision": t.Revision, "baseline_snapshot_id": t.Baseline, "candidate_snapshot_id": t.Candidate, "spec_digest": t.SpecDigest, "behavior_digest": t.BehaviorDigest, "freshness": t.Freshness, "release_readiness": t.Readiness, "checks": t.CheckSummary, "changed_paths": files, "patch": diff, "patch_digest": digest, "base_manifest_digest": t.Baseline, "candidate_manifest_digest": t.Candidate, "base_commit": a.Commit, "build": a.Build, "files": changedFiles(a, b, files), "warning": "See current check summary; incomplete exports are diagnostic."}, nil
+	return map[string]any{"required_checks": required, "plan_digest": t.PlanDigest, "acceptance_criteria": t.Spec.Criteria, "approval_required": t.Kind == "change", "behavior_approved": t.Approved, "task_id": t.ID, "revision": t.Revision, "baseline_snapshot_id": t.Baseline, "candidate_snapshot_id": t.Candidate, "spec_digest": t.SpecDigest, "behavior_digest": t.BehaviorDigest, "freshness": t.Freshness, "freshness_error": t.FreshnessError, "release_readiness": t.Readiness, "checks": t.CheckSummary, "changed_paths": files, "patch": diff, "patch_digest": digest, "base_manifest_digest": t.Baseline, "candidate_manifest_digest": t.Candidate, "base_commit": a.Commit, "build": a.Build, "files": changedFiles(a, b, files), "warning": "See current check summary; incomplete exports are diagnostic."}, nil
 }
 func (s *Service) validateEvidence(ctx context.Context, path string, plan domain.Plan) error {
 	db, e := sql.Open("sqlite3", indexReadDSN(path))

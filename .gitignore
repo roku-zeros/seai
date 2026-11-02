@@ -5,3 +5,5 @@
 *.db-shm
 *.db-wal
 /.gigacode/seai/session.json
+
+__pycache__/

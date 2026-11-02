@@ -58,7 +58,8 @@
         "rules.discover",
         "rules.diagnostics",
         "flow.get",
-        "impact.get"
+        "impact.get",
+        "workspace.check"
       ]
     },
     "params": {

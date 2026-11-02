@@ -19,18 +19,19 @@ import (
 )
 
 type Service struct {
-	Store         *storage.Runtime
-	Workspace     workspace.Service
-	Data          string
-	mu            sync.Mutex
-	wg            sync.WaitGroup
-	busy          bool
-	Config        domain.RuntimeConfig
-	ConfigDigest  string
-	Profiles      map[string]domain.CheckProfile
-	Provider      *qwen.Client
-	controlMu     sync.Mutex
-	cancellations map[string]context.CancelFunc
+	Store           *storage.Runtime
+	Workspace       workspace.Service
+	Data            string
+	mu              sync.Mutex
+	wg              sync.WaitGroup
+	busy            bool
+	Config          domain.RuntimeConfig
+	ConfigDigest    string
+	Profiles        map[string]domain.CheckProfile
+	Provider        *qwen.Client
+	controlMu       sync.Mutex
+	cancellations   map[string]context.CancelFunc
+	FreshnessBudget time.Duration
 }
 type Params struct {
 	Context         map[string]string  `json:"context,omitempty"`
@@ -79,9 +80,9 @@ func (s *Service) Handle(ctx context.Context, method string, p Params) (any, err
 	}
 	switch method {
 	case "handshake":
-		return map[string]string{"schema_version": domain.API, "server_version": "0.4.0-dev"}, nil
+		return map[string]string{"schema_version": domain.API, "server_version": "0.4.1-dev"}, nil
 	case "capabilities.get":
-		capabilities := map[string]any{"business_rules": true, "business_flow": true, "business_impact": true, "business_configured": s.Config.Business != nil && len(s.Config.Business.Adapters) > 0, "business_checks": true, "runner_profiles": checks.ProfileSummaries(s.Profiles), "release_reconciliation": true, "backup_restore": true, "worker_runtime": true, "structural_search": true, "snapshot_reads": true, "text_search": true, "typed_references": true, "static_calls": true, "task_contracts": true, "candidate_patches": true, "product_checks": len(s.Profiles) > 0, "interactive_human_approval": true, "snapshot_modes": []string{"working_tree", "explicit_ref"}, "provider_ready": s.Provider != nil && s.Provider.Verified(), "multi_agent_ready": false, "pilot_ready": false, "blocking_issues": []string{"P0 Qwen and GigaCode profiles are unverified", "domain patterns and verification isolation are unconfigured", "runner isolation, actual Qwen/GigaCode and pilot domain coverage require P0 verification"}, "limitations": indexer.Limitations}
+		capabilities := map[string]any{"source_policy": workspace.SourcePolicy, "excluded_metadata": workspace.MetadataExclusions(), "async_workspace_check": true, "business_rules": true, "business_flow": true, "business_impact": true, "business_configured": s.Config.Business != nil && len(s.Config.Business.Adapters) > 0, "business_checks": true, "runner_profiles": checks.ProfileSummaries(s.Profiles), "release_reconciliation": true, "backup_restore": true, "worker_runtime": true, "structural_search": true, "snapshot_reads": true, "text_search": true, "typed_references": true, "static_calls": true, "task_contracts": true, "candidate_patches": true, "product_checks": len(s.Profiles) > 0, "interactive_human_approval": true, "snapshot_modes": []string{"working_tree", "explicit_ref"}, "provider_ready": s.Provider != nil && s.Provider.Verified(), "multi_agent_ready": false, "pilot_ready": false, "blocking_issues": []string{"P0 Qwen and GigaCode profiles are unverified", "domain patterns and verification isolation are unconfigured", "runner isolation, actual Qwen/GigaCode and pilot domain coverage require P0 verification"}, "limitations": indexer.Limitations}
 		blockers := []string{"P0 actual Qwen/GigaCode and product acceptance remain unverified"}
 		if s.Config.Business == nil || len(s.Config.Business.Adapters) == 0 {
 			blockers = append(blockers, "business adapters are not configured; use rules discover")
@@ -127,7 +128,7 @@ func (s *Service) Handle(ctx context.Context, method string, p Params) (any, err
 		return s.businessQuery(ctx, method, p)
 	case "workspace.status", "files.list", "file.read", "symbol.get", "references.find", "calls.list", "tests.related", "search.text":
 		return s.research(ctx, method, p)
-	case "checks.profiles", "checks.run", "task.verify", "runs.get", "runs.logs", "runs.artifact", "runs.cancel", "provider.status", "provider.probe", "task.run", "agents.list", "release.plan", "release.inspect", "release.apply", "release.rollback", "task.rebase", "backup.create":
+	case "workspace.check", "checks.profiles", "checks.run", "task.verify", "runs.get", "runs.logs", "runs.artifact", "runs.cancel", "provider.status", "provider.probe", "task.run", "agents.list", "release.plan", "release.inspect", "release.apply", "release.rollback", "task.rebase", "backup.create":
 		return s.advanced(ctx, method, p)
 	case "task.create", "task.get", "task.plan", "task.revise", "task.cancel", "task.resume", "patch.apply", "task.diff", "task.export":
 		return s.workflow(ctx, method, p)

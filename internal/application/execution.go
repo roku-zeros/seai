@@ -21,6 +21,8 @@ func (s *Service) fingerprint(t domain.Task) string {
 }
 func (s *Service) advanced(ctx context.Context, method string, p Params) (any, error) {
 	switch method {
+	case "workspace.check":
+		return s.workspaceCheck(ctx, p)
 	case "checks.profiles":
 		return checks.ProfileSummaries(s.Profiles), nil
 	case "provider.status":

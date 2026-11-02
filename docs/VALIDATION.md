@@ -1,4 +1,22 @@
-# Проверки 0.4.0-dev — Go business index, impact и бизнес-прогоны
+# Проверки 0.4.1-dev — большой repo, symlinks и timeouts
+
+2 ноября 2026, macOS arm64, Go 1.26.6. Root race suite: PASS, 48 test functions, все 17 пакетов собираются, 13 имеют tests. `go vet ./...`: PASS. Оба CLI/Unix smoke с JSON Schema validation: PASS, включая прежние checks/backup/restore/upgrade и 9 бизнес-сценариев. Python tests: 15 PASS (11 installer + 4 async-wait). Два изменённых skills прошли quick_validate.
+
+Regression coverage:
+
+- 2629 tracked files: Observe ≈0,312s и 6 Git subprocesses на два полных прохода; durable working Capture ≈29,37s с первичным CAS fsync (6 subprocesses), warm ref Capture ≈0,864s (3). Проверяется постоянное число команд, а не хрупкий фиксированный latency threshold. Это синтетический filesystem стенд, не замер пользовательского проекта.
+- Observe не создаёт CAS и даёт тот же snapshot ID, что durable Capture. Изменение bytes той же длины с восстановленным mtime обнаруживается.
+- Tracked agent metadata symlinks не блокируют working/ref capture и не изменяются. Неинтересный untracked notes.txt symlink отфильтровывается до чтения; source.go symlink отклоняется.
+- Freshness deadline возвращает FRESHNESS_TIMEOUT, task freshness UNKNOWN и NOT_REVIEW_READY. Async workspace check не меняет generation/epoch, новый scan обнаруживает изменения.
+- Живой Unix HTTP server с медленным запросом: timeout не называется отсутствием daemon; следующий project health request обслуживается. Cancellation и отсутствующий socket различаются.
+- Исторический snapshot с обычным AGENTS.md проходит CheckFiles при новой capture policy; старые traversal/secret-path guards сохранены.
+- Async smoke wait принимает SUCCEEDED после 60s при большем budget; ошибка ожидания содержит run ID; FAILED/CANCELLED/ABORTED/NEEDS_INPUT не становятся PASS. Fake clock не замедляет tests.
+
+Реальный повтор на пользовательском стенде после обновления ещё нужен. Скриншоты — evidence симптомов; их команды удаления/перенастройки/остановки процессов не исполнялись. Полная business/Qwen/GigaCode/Docker приёмка не следует из устранения performance bottleneck.
+
+---
+
+## Исторические проверки 0.4.0-dev — Go business index, impact и бизнес-прогоны
 
 2 ноября 2026, macOS arm64, Go 1.26.6. Полная race suite и адресные повторы новых сценариев прошли: 41 test functions в корневом модуле; 17 пакетов собираются, 12 имеют собственные tests. Дополнительно fixtures/business имеет два Go tests и исполняемый JSON probe.
 

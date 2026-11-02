@@ -69,7 +69,8 @@
     "freshness": {
       "enum": [
         "CURRENT",
-        "STALE"
+        "STALE",
+        "UNKNOWN"
       ]
     },
     "release_readiness": {
@@ -89,6 +90,12 @@
         "local-import",
         "not_checked",
         "human-confirmed"
+      ]
+    },
+    "freshness_error": {
+      "type": [
+        "object",
+        "null"
       ]
     }
   },

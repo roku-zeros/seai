@@ -31,10 +31,14 @@ func run() error {
 	repo := flag.String("repo", "", "Git repository root")
 	data := flag.String("data", "", "private runtime directory outside repository")
 	project := flag.String("project", "", "explicit project identity")
+	rpcTimeout := flag.Duration("rpc-timeout", transports.DefaultRPCTimeout, "response write timeout for individual RPCs")
 	config := flag.String("config", "", "operator-owned JSON runtime profiles and optional Qwen configuration")
 	version := flag.Bool("version", false, "print executable compatibility manifest")
 	checkData := flag.Bool("check-data", false, "offline migrate and integrity-check runtime, then exit")
 	flag.Parse()
+	if *rpcTimeout <= 0 || *rpcTimeout > 30*time.Minute {
+		return fmt.Errorf("--rpc-timeout must be >0 and <=30m")
+	}
 	if *version {
 		fmt.Println(string(maintenance.VersionJSON()))
 		return nil
@@ -113,7 +117,7 @@ func run() error {
 		listener.Close()
 		return e
 	}
-	server := &http.Server{Handler: transports.Handler(s), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 35 * time.Second, IdleTimeout: 30 * time.Second}
+	server := &http.Server{Handler: transports.Handler(s), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: *rpcTimeout + 5*time.Second, IdleTimeout: 30 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go func() {
@@ -122,7 +126,7 @@ func run() error {
 		defer cancel()
 		_ = server.Shutdown(shutdown)
 	}()
-	log.Printf("seaid 0.4.0-dev project=%s socket=%s", *project, sock)
+	log.Printf("seaid 0.4.1-dev project=%s socket=%s", *project, sock)
 	e = server.Serve(listener)
 	s.CancelRuns()
 	s.Wait()

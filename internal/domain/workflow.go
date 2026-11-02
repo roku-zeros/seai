@@ -69,6 +69,7 @@ type Patch struct {
 	Files      []FileOperation `json:"files"`
 }
 type Task struct {
+	FreshnessError        *Error         `json:"freshness_error,omitempty"`
 	ID                    string         `json:"task_id"`
 	Alias                 string         `json:"alias"`
 	Kind                  string         `json:"kind"`

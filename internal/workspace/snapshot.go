@@ -32,10 +32,24 @@ func Git(ctx context.Context, root string, args ...string) ([]byte, error) {
 func ValidPath(p string) bool {
 	return utf8.ValidString(p) && !strings.ContainsRune(p, 0) && p != "" && !strings.Contains(p, "\\") && !filepath.IsAbs(p) && filepath.ToSlash(filepath.Clean(p)) == p && p != ".." && !strings.HasPrefix(p, "../")
 }
+
+const SourcePolicy = "seai.source-policy/v2"
+
+func MetadataExclusions() []string {
+	return []string{"**/.agents/**", "**/.codex/**", "**/.gigacode/**", "**/AGENTS.md", "**/GIGACODE.md"}
+}
 func excluded(p string) bool {
+	for _, part := range strings.Split(p, "/") {
+		if part == ".agents" || part == ".codex" || part == ".gigacode" || part == "AGENTS.md" || part == "GIGACODE.md" {
+			return true
+		}
+	}
+	return legacyExcluded(p)
+}
+func legacyExcluded(p string) bool {
 	return p == ".git" || strings.HasPrefix(p, ".git/") || p == ".seai" || strings.HasPrefix(p, ".seai/") || strings.HasSuffix(p, ".key") || filepath.Base(p) == ".env" || strings.HasPrefix(p, "vendor/")
 }
-func (s Service) capture(ctx context.Context, ref string) (domain.Manifest, error) {
+func (s Service) capture(ctx context.Context, ref string, persist bool) (domain.Manifest, error) {
 	m := domain.Manifest{Schema: "seai.source/v1", Repository: s.Project, Build: s.Build, Files: []domain.File{}}
 	target := "HEAD"
 	if ref != "" {
@@ -49,23 +63,52 @@ func (s Service) capture(ctx context.Context, ref string) (domain.Manifest, erro
 		return m, e
 	}
 	m.Commit = strings.TrimSpace(string(commit))
+	sourceRoot, e := os.OpenRoot(s.Root)
+	if e != nil {
+		return m, e
+	}
+	defer sourceRoot.Close()
 	var entries []string
+	tracked := map[string]bool{}
+	var batch *blobBatch
 	if ref != "" {
 		b, e := Git(ctx, s.Root, "ls-tree", "-rz", "--full-tree", m.Commit)
 		if e != nil {
 			return m, e
 		}
 		entries = strings.Split(string(b), "\x00")
-	} else {
-		b, e := Git(ctx, s.Root, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+		batch, e = newBlobBatch(ctx, s.Root)
 		if e != nil {
 			return m, e
 		}
-		entries = strings.Split(string(b), "\x00")
+		defer batch.abort()
+	} else {
+		b, e := Git(ctx, s.Root, "ls-files", "--cached", "-z")
+		if e != nil {
+			return m, e
+		}
+		for _, path := range strings.Split(string(b), "\x00") {
+			if path != "" && !tracked[path] {
+				tracked[path] = true
+				entries = append(entries, path)
+			}
+		}
+		b, e = Git(ctx, s.Root, "ls-files", "--others", "--exclude-standard", "-z")
+		if e != nil {
+			return m, e
+		}
+		for _, path := range strings.Split(string(b), "\x00") {
+			if path != "" && !tracked[path] && relevantUntracked(path) {
+				entries = append(entries, path)
+			}
+		}
 	}
 	seen := map[string]bool{}
 	folded := map[string]string{}
 	for _, entry := range entries {
+		if e = ctx.Err(); e != nil {
+			return m, e
+		}
 		if entry == "" {
 			continue
 		}
@@ -89,7 +132,7 @@ func (s Service) capture(ctx context.Context, ref string) (domain.Manifest, erro
 			if mode != "100644" && mode != "100755" {
 				return m, domain.Err("UNSUPPORTED_SOURCE", "symlink/submodule: %s", p)
 			}
-			data, e = Git(ctx, s.Root, "cat-file", "blob", fields[2])
+			data, e = batch.read(fields[2])
 		} else {
 			if excluded(p) {
 				continue
@@ -102,11 +145,11 @@ func (s Service) capture(ctx context.Context, ref string) (domain.Manifest, erro
 			}
 			// Reject every symlink ancestor rather than following it outside the root.
 			parts := strings.Split(p, "/")
-			current := s.Root
+			current := ""
 			var info os.FileInfo
 			for _, part := range parts {
 				current = filepath.Join(current, part)
-				info, e = os.Lstat(current)
+				info, e = sourceRoot.Lstat(current)
 				if e != nil {
 					break
 				}
@@ -126,7 +169,7 @@ func (s Service) capture(ctx context.Context, ref string) (domain.Manifest, erro
 			if info.Mode()&0111 != 0 {
 				mode = "100755"
 			}
-			data, e = os.ReadFile(current)
+			data, e = sourceRoot.ReadFile(p)
 		}
 		if e != nil {
 			return m, e
@@ -140,29 +183,43 @@ func (s Service) capture(ctx context.Context, ref string) (domain.Manifest, erro
 		}
 		folded[lower] = p
 		seen[p] = true
-		// Relevant untracked files only; tracked files are always retained unless explicitly excluded.
-		if ref == "" {
-			if _, e = Git(ctx, s.Root, "ls-files", "--error-unmatch", "--", p); e != nil && !strings.HasSuffix(p, ".go") && !strings.HasPrefix(p, "testdata/") && p != "go.mod" && p != "go.sum" {
-				continue
+		id := domain.Digest(data)
+		if persist {
+			var err error
+			id, err = s.Objects.Put(data)
+			if err != nil {
+				return m, err
 			}
 		}
-		id, e := s.Objects.Put(data)
-		if e != nil {
+		m.Files = append(m.Files, domain.File{Path: p, Mode: mode, Digest: id})
+	}
+	if batch != nil {
+		if e = batch.finish(); e != nil {
 			return m, e
 		}
-		m.Files = append(m.Files, domain.File{Path: p, Mode: mode, Digest: id})
 	}
 	sort.Slice(m.Files, func(i, j int) bool { return m.Files[i].Path < m.Files[j].Path })
 	return m, nil
 }
+func relevantUntracked(p string) bool {
+	return !excluded(p) && (strings.HasSuffix(p, ".go") || strings.HasPrefix(p, "testdata/") || p == "go.mod" || p == "go.sum")
+}
+
+// Observe computes the same stable working-tree identity without writing CAS.
+func (s Service) Observe(ctx context.Context) (domain.Manifest, string, error) {
+	return s.stable(ctx, "", false)
+}
 func (s Service) Capture(ctx context.Context, ref string) (domain.Manifest, string, error) {
+	return s.stable(ctx, ref, true)
+}
+func (s Service) stable(ctx context.Context, ref string, persist bool) (domain.Manifest, string, error) {
 	for attempt := 0; attempt < 3; attempt++ {
-		a, e := s.capture(ctx, ref)
+		a, e := s.capture(ctx, ref, persist)
 		if e != nil {
 			return a, "", e
 		}
 		if ref == "" {
-			b, e := s.capture(ctx, ref)
+			b, e := s.capture(ctx, ref, persist)
 			if e != nil {
 				return a, "", e
 			}
@@ -175,6 +232,9 @@ func (s Service) Capture(ctx context.Context, ref string) (domain.Manifest, stri
 		b, e := domain.Canonical(a)
 		if e != nil {
 			return a, "", e
+		}
+		if !persist {
+			return a, domain.Digest(b), nil
 		}
 		id, e := s.Objects.Put(b)
 		return a, id, e
@@ -206,8 +266,12 @@ func Materialize(m domain.Manifest, c storage.CAS, dest string) error {
 }
 
 // ValidSourcePath applies snapshot exclusions to new candidate files too.
-func ValidSourcePath(p string) bool {
-	if !ValidPath(p) || excluded(p) {
+func ValidSourcePath(p string) bool { return ValidStoredSourcePath(p) && !excluded(p) }
+
+// ValidStoredSourcePath preserves safety validation for historical manifests,
+// including regular agent metadata files captured before policy v2.
+func ValidStoredSourcePath(p string) bool {
+	if !ValidPath(p) || legacyExcluded(p) {
 		return false
 	}
 	for _, part := range strings.Split(p, "/") {

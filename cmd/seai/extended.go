@@ -40,6 +40,9 @@ func parseExtended(args []string) (string, application.Params, extendedOptions, 
 	}
 	switch args[0] {
 	case "workspace":
+		if len(args) > 1 && args[1] == "check" {
+			return parseRuntime(args)
+		}
 		if len(args) != 2 || args[1] != "status" {
 			return bad()
 		}

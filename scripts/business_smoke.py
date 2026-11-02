@@ -9,9 +9,11 @@ import shutil
 import subprocess
 import tempfile
 import time
+from smoke_support import wait_for_run
 
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--bin',required=True,type=Path)
+p.add_argument("--run-timeout",type=float,default=None,help="async wait budget; default runtime max_run_seconds + 30s")
 a=p.parse_args()
 binaries=a.bin.resolve()
 source=Path(__file__).resolve().parents[1]
@@ -60,12 +62,8 @@ with tempfile.TemporaryDirectory(prefix='seai-business-') as tmp:
                 if name in validators:validators[name].validate(value['data'])
                 return value['data']
             def wait(accepted):
-                rid=accepted['run_id']
-                for _ in range(3000):
-                    result=cli('run','status',rid)
-                    if result['state'] not in ['RUNNING','QUEUED']:return result
-                    time.sleep(.1)
-                raise RuntimeError('execution timeout')
+                budget=a.run_timeout if a.run_timeout is not None else json.loads(cfg.read_text())["max_run_seconds"]+30
+                return wait_for_run(lambda rid: cli('run','status',rid),accepted['run_id'],budget)
             proc=start()
             assert cli('index','build','--wait')['state']=='SUCCEEDED'
             assert cli('rules','discover')['candidates']
@@ -113,7 +111,7 @@ with tempfile.TemporaryDirectory(prefix='seai-business-') as tmp:
             proc=start()
             assert cli('rules','search','AGE_MIN')['rules']
             assert cli('run','status',result['run_id'])['state']=='SUCCEEDED'
-            print(json.dumps(dict(status='passed',version='0.4.0-dev',checks=['typed Go registrations','duplicate IDs by context','source evidence','shared impact across products','forward constants/conditions','candidate domain gate','9 executed business fixtures','normal/boundary/exception/combination coverage','rule trace','candidate generation pinning','restart','source preserved']),indent=2))
+            print(json.dumps(dict(status='passed',version='0.4.1-dev',checks=['typed Go registrations','duplicate IDs by context','source evidence','shared impact across products','forward constants/conditions','candidate domain gate','9 executed business fixtures','normal/boundary/exception/combination coverage','rule trace','candidate generation pinning','restart','source preserved']),indent=2))
         finally:
             if proc is not None and proc.poll() is None:proc.terminate();proc.wait(timeout=20)
             shutil.rmtree(data)

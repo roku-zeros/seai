@@ -146,7 +146,7 @@ Backup создаёт согласованный SQLite VACUUM INTO snapshot и 
 ```json
 {
   "schema_version": "seai.upgrade/v1",
-  "product_version": "0.4.0-dev",
+  "product_version": "0.4.1-dev",
   "api_version": "seai.api/v1",
   "runtime_schema": 3,
   "seai": "/absolute/new/seai",
@@ -163,6 +163,8 @@ seai --data OLD_DATA upgrade prepare \
   --bundle /absolute/bundle.json --output /absolute/NEW_INSTALLATION
 ```
 
-Команда требует эксклюзивную daemon.lock, проверяет hashes/version/API/schema, создаёт согласованный backup, восстанавливает/мигрирует данные в NEW_INSTALLATION/data, копирует бинарники и запускает новый seaid --check-data. Поддержан только bundle текущего `0.4.0-dev` и runtime 2/3; произвольные будущие миграции не обещаются. Бинарники bundle — исполняемый код оператора: checksum устанавливает идентичность, а не доверие. Старые данные/бинарники не заменяются; **автоматической активации нет**. Ошибка удаляет новую подготовленную установку.
+Команда требует эксклюзивную daemon.lock, проверяет hashes/version/API/schema, создаёт согласованный backup, восстанавливает/мигрирует данные в NEW_INSTALLATION/data, копирует бинарники и запускает новый seaid --check-data. Поддержан только bundle текущего `0.4.1-dev` и runtime 2/3; произвольные будущие миграции не обещаются. Бинарники bundle — исполняемый код оператора: checksum устанавливает идентичность, а не доверие. Старые данные/бинарники не заменяются; **автоматической активации нет**. Ошибка удаляет новую подготовленную установку.
 
 После успеха вручную запустите NEW_INSTALLATION/seaid с NEW_INSTALLATION/data, прежними repo/project и вашим config. Обновите пути установки skills/session. До начала новой работы rollback — остановить новый daemon и запустить прежний с OLD_DATA. После новой работы сначала сохраните новый backup: простой возврат к старому runtime потеряет новую историю. Downgrade schema 3 старым бинарником не поддерживается. `seaid --version` печатает manifest, `seaid --data DATA --check-data` offline мигрирует и проверяет SQLite под lock.
+
+Большой проект, RPC timeout, UNKNOWN freshness и async workspace check — [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

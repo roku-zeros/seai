@@ -1,4 +1,4 @@
-# SEAI 0.4: исследование → контракт → изолированный candidate
+# SEAI 0.4.1: исследование → контракт → изолированный candidate
 
 Реализованы первые три этапа: чтение/навигация по неизменяемым исходникам, сохранение задачи и плана, применение ограниченных file operations в CAS candidate. Этапы 4–6 добавляют зарегистрированные checks, Qwen workers, независимый human/model review, release reconciliation и backup/restore/upgrade: см. [EXECUTION.md](EXECUTION.md). Без настройки и актуальных доказательств итог остаётся `NOT_REVIEW_READY`; готовность пилота не заявляется.
 
@@ -122,3 +122,7 @@ CLI автоматически получает текущие expected_revision
 Для обновления останови старый daemon, собери новые бинарники и запусти seaid с прежними repo/data/project. Затем явно перестрой индекс. SQL migration 001 неизменна; runtime автоматически получает migrations 002/003 с checksum. Backup/restore/staged upgrade описаны в EXECUTION.md; продуктовый пилот требует отдельной приёмки. Новая версия использует Go 1.26.6+, YAML v3.0.1 и structural-v3.
 
 Пока отсутствуют FTS5/ranking, incremental rebuild, полный Go graph и принудительный SEAI-only sandbox для GigaCode. Worker/check/rebase/maintenance workflow доступен в объёме EXECUTION.md. Эти ограничения остаются видны в doctor/diagnostics/отчётах. Предметные Go-адаптеры и бизнес-прогоны доступны в объёме BUSINESS.md. Этапы 1–3 проверены в пределах описанных контрактов; готовность реального продуктового пилота требует P0 и следующих этапов исходной спецификации.
+
+## Производительность и неизвестная свежесть
+
+Live checks используют read-only стабильное хеширование без CAS. При FRESHNESS_TIMEOUT статус задачи UNKNOWN; готовность не подтверждается. Для длинного scan доступен workspace check → run status. Agent metadata исключена по source-policy/v2, старые snapshots сохраняются. Подробнее — [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

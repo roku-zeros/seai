@@ -1,4 +1,14 @@
-# Статус реализации 0.4.0-dev
+# Статус реализации 0.4.1-dev
+
+Исправления по пользовательскому прогону большого Go-проекта: bulk tracked/untracked enumeration, Git cat-file --batch, read-only стабильный Observe для freshness без CAS writes, 15s freshness budget и async workspace check. RPC timeout/cancel/отсутствующий socket различаются; client/daemon RPC budget настраивается. UNKNOWN freshness не становится REVIEW_READY.
+
+Agent metadata (.agents/.codex/.gigacode/AGENTS.md/GIGACODE.md) исключена в working/ref capture без изменения ссылок на диске. Source symlinks остаются unsupported; root-scoped reads не выходят за пределы repo. Исторические регулярные metadata-files остаются валидными для backup/restore; runtime schema 3 сохранена. Smoke waits используют monotonic runtime budget и не выдают client timeout за terminal check verdict.
+
+Поведение, обновление daemon и pinned reads — [TROUBLESHOOTING.md](TROUBLESHOOTING.md). Прежние P0/GigaCode/Qwen/Docker и ограничения бизнес-графа не объявляются закрытыми этими исправлениями.
+
+---
+
+# Исторический статус реализации 0.4.0-dev
 
 Добавлены три запрошенных направления: typed предметный Go-индекс; bounded flow/impact с shared consumers; бизнес-сценарии и comparison reports. Поддержаны struct/call/function adapters, constant IDs/context/priority, handlers и source facts, revisioned requirement links, duplicate IDs по context и явные diagnostics. Адаптеры и их config входят в identity structural-v4/business-v1; старые поколения сохраняются.
 

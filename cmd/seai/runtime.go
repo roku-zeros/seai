@@ -43,6 +43,9 @@ func parseRuntime(args []string) (string, application.Params, extendedOptions, e
 	case "provider probe":
 		method = "provider.probe"
 		o.mutation = true
+	case "workspace check":
+		method = "workspace.check"
+		o.mutation = true
 	case "backup create":
 		method = "backup.create"
 		o.mutation = true
